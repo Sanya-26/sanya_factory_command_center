@@ -1,0 +1,26 @@
+# Cloudflare Pages applies these to every response from welcome.aubos.ai.
+# Tuned for a React + three.js + Supabase + ElevenLabs voice app.
+#
+# CSP details:
+# - script-src 'self' 'wasm-unsafe-eval' — three.js + lipsync wasm modules
+#   need wasm-unsafe-eval; no inline scripts anywhere in the build
+# - style-src 'unsafe-inline' — Tailwind + R3F + shadcn inject runtime styles
+# - connect-src — Supabase REST + functions + realtime WSS (the cleo-* edge
+#   functions, cleo-stt is WSS to functions.supabase.co, plus the storage
+#   bucket for the avatar GLB)
+# - media-src — the streaming TTS MP3 from cleo-tts arrives as application/octet-stream
+#   then we feed it into MediaSource, so blob: is required
+# - img-src — Supabase storage (cleo-avatars + brand assets), data: for inline SVGs
+# - frame-ancestors 'none' — prevents clickjacking by refusing iframe embedding
+# - permissions-policy — explicitly grants microphone (Cleo voice chat needs it);
+#   blocks everything else (camera, geolocation, payment, USB, etc.)
+
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://jzppqxiprjsuvuyulbyj.supabase.co; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' blob: data: https://jzppqxiprjsuvuyulbyj.supabase.co wss://jzppqxiprjsuvuyulbyj.supabase.co https://jzppqxiprjsuvuyulbyj.functions.supabase.co wss://jzppqxiprjsuvuyulbyj.functions.supabase.co; media-src 'self' data: blob: https://jzppqxiprjsuvuyulbyj.functions.supabase.co; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests
+  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: microphone=(self), camera=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: same-site

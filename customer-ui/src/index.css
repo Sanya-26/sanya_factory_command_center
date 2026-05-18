@@ -4,6 +4,12 @@
 
 :root {
   color-scheme: dark;
+  /* Typography tokens — used across the onboarding chrome. Inter is loaded
+     from Google Fonts in index.html; system fonts are the fallback chain
+     if the network is slow or blocked. Mono is reserved for technical
+     tags / IDs / measurements where character alignment matters. */
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, "Cascadia Mono", monospace;
 }
 
 html, body, #root {
@@ -15,9 +21,11 @@ html, body, #root {
 body {
   background: #050505;
   color: #ededed;
-  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-sans);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";  /* Inter alt characters: sharper l, alt 1, alt 4, simpler g */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 /* ─── Mono "blueprint" canvas node ──────────────────────────────────── */
@@ -425,32 +433,60 @@ body {
    for tech texture, and a downstage uplight glow. Pure gradients — no
    images, no third-party assets. All layers stay under ~3% opacity so
    Cleo remains the focal point and the page never feels busy. */
+/* Stage backdrop — deep, atmospheric, animated. Six gradient layers
+   build the depth-of-field: a central halo (focal point for the voice
+   orb), wide diagonal aurora blooms, side accent washes, top + bottom
+   atmosphere bands, and a true-black radial base that pushes the edges
+   into the dark. The aurora layers slowly drift via `--bg-shift`
+   (animated below) so the backdrop never feels static. */
 .aubos-onb-stage {
   position: fixed;
   inset: 0;
   background:
-    /* Aurora halo behind Cleo's head — stronger purple bloom centered
-       just behind where her head sits in frame (upper-third). The
-       camera is at eye-line so the head is at ~30% from top. */
-    radial-gradient(ellipse 50% 40% at 50% 28%, rgba(139, 92, 246, 0.35), transparent 75%),
-    radial-gradient(ellipse 30% 25% at 50% 28%, rgba(196, 181, 253, 0.20), transparent 70%),
-    /* Side depth — cool blue on left, warm violet on right */
-    radial-gradient(ellipse 50% 100% at 0% 50%, rgba(59, 130, 246, 0.12), transparent 60%),
-    radial-gradient(ellipse 50% 100% at 100% 50%, rgba(168, 85, 247, 0.10), transparent 60%),
-    /* Downstage uplight — soft cyan, sells the "she's standing on a stage" feel */
-    radial-gradient(ellipse 80% 30% at 50% 100%, rgba(56, 189, 248, 0.14), transparent 70%),
-    /* Horizon scan-line — 1px bright line at exactly mid-height; the eye
-       reads this as a stage edge / horizon, anchoring depth */
-    linear-gradient(to bottom, transparent 49.5%, rgba(255, 255, 255, 0.04) 50%, transparent 50.5%),
-    /* Ultra-faint grid — 80px squares of cool-blue lines at 2.5% opacity.
-       Adds "futuristic tech surface" texture without competing for attention */
-    linear-gradient(to right,  rgba(96, 165, 250, 0.025) 1px, transparent 1px) 0 0 / 80px 80px,
-    linear-gradient(to bottom, rgba(96, 165, 250, 0.025) 1px, transparent 1px) 0 0 / 80px 80px,
-    /* Deep midnight base — radial darkens toward edges for vignette feel */
-    radial-gradient(ellipse at center, #0a0e1a 0%, #050608 90%);
+    /* Halo behind the voice orb — soft white-purple bloom anchoring the focal point */
+    radial-gradient(ellipse 38% 32% at 50% 48%, rgba(196, 181, 253, 0.20), transparent 72%),
+    radial-gradient(ellipse 28% 22% at 50% 48%, rgba(255, 255, 255, 0.08), transparent 65%),
+    /* Diagonal aurora blooms — these animate via the keyframes below */
+    radial-gradient(ellipse 60% 50% at 22% 28%, rgba(139, 92, 246, 0.28), transparent 70%),
+    radial-gradient(ellipse 60% 50% at 78% 72%, rgba(56, 189, 248, 0.22), transparent 70%),
+    /* Atmospheric bands — top has the cooler tone, bottom has warmth */
+    linear-gradient(to bottom, rgba(8, 10, 22, 0.0) 0%, rgba(8, 10, 22, 0.4) 100%),
+    /* Subtle scan line at the focal mid-height */
+    linear-gradient(to bottom, transparent 49.6%, rgba(255, 255, 255, 0.04) 50%, transparent 50.4%),
+    /* Tech-surface grid, very faint */
+    linear-gradient(to right,  rgba(96, 165, 250, 0.02) 1px, transparent 1px) 0 0 / 96px 96px,
+    linear-gradient(to bottom, rgba(96, 165, 250, 0.02) 1px, transparent 1px) 0 0 / 96px 96px,
+    /* True deep base — radial darkens to near-black at the corners */
+    radial-gradient(ellipse 90% 90% at 50% 50%, #0a0c1a 0%, #04050a 90%);
+  background-attachment: fixed;
+  background-size:
+    100% 100%, 100% 100%,
+    140% 140%, 140% 140%,
+    100% 100%, 100% 100%,
+    96px 96px, 96px 96px,
+    100% 100%;
+  background-position:
+    50% 50%, 50% 50%,
+    calc(22% + var(--bg-shift-x, 0px)) calc(28% + var(--bg-shift-y, 0px)),
+    calc(78% - var(--bg-shift-x, 0px)) calc(72% - var(--bg-shift-y, 0px)),
+    0 0, 0 0,
+    0 0, 0 0,
+    50% 50%;
   color: #ededed;
   overflow: hidden;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-sans);
+  animation: aubos-bg-drift 24s ease-in-out infinite alternate;
+}
+
+/* Bonus: enable CSS variable animation. Without @property, browsers
+   can't tween custom properties, so we drive it via background-position
+   shifts using the keyframes' position interpolation. */
+@property --bg-shift-x { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --bg-shift-y { syntax: "<length>"; inherits: false; initial-value: 0px; }
+
+@keyframes aubos-bg-drift {
+  0%   { --bg-shift-x: -40px; --bg-shift-y: -20px; }
+  100% { --bg-shift-x:  40px; --bg-shift-y:  20px; }
 }
 
 /* Floating motes — slow-drifting particles for atmosphere. Multiple radial
@@ -482,36 +518,79 @@ body {
 }
 
 /* top status bar */
+/* Top status bar — uses Inter, refined sizing scale, sharper chrome */
 .aubos-onb-stage-top {
   position: absolute;
   top: 0; left: 0; right: 0;
   display: flex; justify-content: space-between; align-items: center;
-  padding: 18px 24px;
+  padding: 20px 28px;
   z-index: 10;
+  font-family: var(--font-sans);
+}
+.aubos-onb-stage-top .aubos-onb-brand {
+  display: flex; align-items: baseline; gap: 8px;
 }
 .aubos-onb-stage-top .aubos-onb-brand strong {
-  font-size: 0.74rem; letter-spacing: 0.18em; text-transform: uppercase;
+  font-size: 0.78rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
 }
 .aubos-onb-stage-top .aubos-onb-brand small {
-  color: rgba(255,255,255,0.5); font-size: 0.62rem; margin-left: 4px;
+  color: rgba(255, 255, 255, 0.40);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  font-weight: 400;
 }
 .aubos-onb-stage-customer {
-  display: flex; gap: 14px; align-items: center;
-  font-size: 0.7rem; color: rgba(255, 255, 255, 0.65);
+  display: flex; gap: 10px; align-items: center;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+.aubos-onb-company-chip {
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.85);
+}
+.aubos-onb-canvas-toggle,
+.aubos-onb-signout {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.78);
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  font-weight: 500;
+  padding: 7px 14px;
+  border-radius: 8px;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.08s;
 }
 .aubos-onb-canvas-toggle {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: rgba(255, 255, 255, 0.75);
-  font-family: inherit; font-size: 0.6rem;
-  padding: 6px 12px; border-radius: 4px;
-  letter-spacing: 0.08em; text-transform: uppercase;
-  cursor: pointer; transition: all 0.15s;
+  text-transform: lowercase;
+  font-feature-settings: "tnum";  /* tabular numbers for "X nodes" */
 }
-.aubos-onb-canvas-toggle:hover {
+.aubos-onb-canvas-toggle:hover,
+.aubos-onb-signout:hover {
   background: rgba(255, 255, 255, 0.10);
-  border-color: rgba(255, 255, 255, 0.30);
+  border-color: rgba(255, 255, 255, 0.28);
   color: #fff;
+}
+.aubos-onb-canvas-toggle:active,
+.aubos-onb-signout:active { transform: scale(0.97); }
+.aubos-onb-signout {
+  color: rgba(255, 255, 255, 0.5);
+}
+.aubos-onb-signout:hover {
+  color: rgba(248, 113, 113, 0.95);  /* subtle red on hover, signals destructive */
+  border-color: rgba(248, 113, 113, 0.35);
+  background: rgba(248, 113, 113, 0.08);
 }
 
 /* the 3D canvas takes the whole screen below the top bar */
@@ -529,13 +608,14 @@ body {
   height: 100% !important;
 }
 
-/* Caption under Cleo */
+/* Caption — what Cleo just said. Premium subtitle styling: Inter,
+   tighter padding, larger text, subtle glow on the speaking state. */
 .aubos-onb-caption {
   position: absolute;
-  bottom: 110px;
+  bottom: 120px;
   left: 50%; transform: translateX(-50%);
-  max-width: 720px; width: calc(100% - 64px);
-  padding: 12px 18px;
+  max-width: 680px; width: calc(100% - 64px);
+  padding: 0;
   text-align: center;
   z-index: 5;
   pointer-events: none;
@@ -543,41 +623,78 @@ body {
 }
 .aubos-onb-caption span {
   display: inline-block;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  padding: 10px 18px;
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.92);
-  line-height: 1.45;
-}
-.aubos-onb-caption .hint {
-  color: rgba(255, 255, 255, 0.45);
-  font-size: 0.72rem;
-  font-style: italic;
-}
-.aubos-onb-caption.speaking span {
-  border-color: rgba(96, 165, 250, 0.5);
-  box-shadow: 0 0 24px rgba(96, 165, 250, 0.18);
-}
-
-/* Bottom input bar */
-.aubos-onb-input-bar {
-  position: absolute;
-  bottom: 24px;
-  left: 50%; transform: translateX(-50%);
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  width: calc(100% - 48px);
-  max-width: 720px;
-  z-index: 6;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(12px);
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;
-  padding: 8px;
+  padding: 14px 22px;
+  font-family: var(--font-sans);
+  font-size: 1.02rem;
+  font-weight: 400;
+  letter-spacing: -0.005em;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.96);
+  text-wrap: pretty;
+}
+.aubos-onb-caption .hint {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.85rem;
+  font-weight: 400;
+  font-style: normal;
+}
+.aubos-onb-caption.speaking span {
+  border-color: rgba(96, 165, 250, 0.45);
+  box-shadow: 0 0 32px rgba(96, 165, 250, 0.22);
+}
+.aubos-onb-caption.transcript span {
+  color: rgba(255, 255, 255, 0.72);
+  font-style: italic;
+}
+
+/* Bottom input bar — Apple "liquid glass" treatment.
+   Layers, in order, are critical for the look:
+     1. Translucent base color (very thin so the backdrop bleeds through)
+     2. Heavy backdrop-filter blur + saturate (the actual frosted-glass effect)
+     3. A subtle inner highlight gradient (top edge brighter — mimics glass refraction)
+     4. A 1px border that's NOT a flat color — top half lighter than bottom (mimics
+        light hitting a curved glass edge)
+     5. A drop shadow + a separate inset shadow for the floating feel
+   The whole thing reads as a piece of glass hovering above the stage. */
+.aubos-onb-input-bar {
+  position: absolute;
+  bottom: 28px;
+  left: 50%; transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: calc(100% - 56px);
+  max-width: 780px;
+  z-index: 6;
+
+  background:
+    /* Inner top-edge highlight — fakes the bright refraction line on glass */
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0) 40%),
+    /* Base translucent tint */
+    rgba(20, 24, 38, 0.42);
+  backdrop-filter: blur(40px) saturate(180%) brightness(1.05);
+  -webkit-backdrop-filter: blur(40px) saturate(180%) brightness(1.05);
+
+  /* Two-tone border — lighter at top, darker at bottom, gives the 3D
+     "glass lozenge" feel rather than a flat outlined rectangle. */
+  border: 1px solid transparent;
+  border-image: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.04)) 1;
+  border-radius: 20px;
+
+  padding: 12px;
+  font-family: var(--font-sans);
+
+  /* Floating shadow + inner glow */
+  box-shadow:
+    0 24px 64px -16px rgba(0, 0, 0, 0.6),
+    0 8px 24px -8px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 1px 0 0 rgba(255, 255, 255, 0.08) inset;
 }
 .aubos-onb-input-bar textarea {
   flex: 1;
@@ -585,15 +702,19 @@ body {
   border: 0;
   color: #fff;
   resize: none;
-  font-family: inherit;
-  font-size: 0.85rem;
-  padding: 8px 12px;
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  font-weight: 400;
+  letter-spacing: -0.005em;
+  line-height: 1.5;
+  padding: 10px 14px;
   outline: none;
-  min-height: 24px;
-  max-height: 80px;
+  min-height: 28px;
+  max-height: 96px;
 }
 .aubos-onb-input-bar textarea::placeholder {
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 255, 255, 0.40);
+  font-weight: 400;
 }
 .aubos-onb-input-bar textarea:disabled {
   opacity: 0.5;
@@ -1337,35 +1458,188 @@ body {
 /* ─── S3: voice loop UI ──────────────────────────────────────────────── */
 
 .aubos-onb-mic-btn {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.7);
-  border-radius: 8px;
-  width: 36px;
-  height: 36px;
+  position: relative;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.78);
+  border-radius: 10px;
+  width: 40px;
+  height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background 120ms, border-color 120ms, color 120ms;
-  margin-right: 6px;
+  transition: background 0.14s, border-color 0.14s, color 0.14s, transform 0.08s;
+  flex-shrink: 0;
 }
 
 .aubos-onb-mic-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.10);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.28);
 }
+.aubos-onb-mic-btn:active:not(:disabled) { transform: scale(0.94); }
 
+/* LIVE state — three concurrent signals so it's impossible to miss:
+   1. Solid red fill (vs ghosted ring when idle) — high-contrast color shift
+   2. Pulsing inner glow (1s heartbeat — physiological, reads as "alive")
+   3. Three expanding ripple rings (the "broadcast" signal — clearly active)
+   The button itself becomes a focal point of the screen. */
 .aubos-onb-mic-btn.active {
-  background: rgba(239, 68, 68, 0.15);
-  border-color: rgba(239, 68, 68, 0.5);
-  color: #fca5a5;
-  animation: aubos-mic-pulse 1.6s ease-in-out infinite;
+  background: rgba(239, 68, 68, 0.92);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #ffffff;
+  animation: aubos-mic-heartbeat 1s ease-in-out infinite;
+}
+.aubos-onb-mic-btn.active::before,
+.aubos-onb-mic-btn.active::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 12px;
+  border: 2px solid rgba(239, 68, 68, 0.7);
+  pointer-events: none;
+  animation: aubos-mic-ripple 1.6s ease-out infinite;
+}
+.aubos-onb-mic-btn.active::after {
+  animation-delay: 0.8s;
 }
 
-@keyframes aubos-mic-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.45); }
-  50%      { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+@keyframes aubos-mic-heartbeat {
+  0%, 100% {
+    box-shadow:
+      0 0 0 0 rgba(239, 68, 68, 0.55),
+      0 0 20px rgba(239, 68, 68, 0.5),
+      0 0 0 1px rgba(255, 255, 255, 0.2) inset;
+  }
+  50% {
+    box-shadow:
+      0 0 0 6px rgba(239, 68, 68, 0),
+      0 0 32px rgba(239, 68, 68, 0.7),
+      0 0 0 1px rgba(255, 255, 255, 0.3) inset;
+  }
+}
+@keyframes aubos-mic-ripple {
+  0%   { transform: scale(1);    opacity: 0.7; }
+  100% { transform: scale(2.0);  opacity: 0; }
+}
+
+/* ─── Chat history panel ────────────────────────────────────────────────
+   Slides in from the LEFT (canvas drawer slides in from the right; Cleo
+   sits in the middle as the focal point). Auto-scrolled to the bottom on
+   every new message via chatScrollRef. */
+.aubos-onb-chatfeed {
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  width: min(420px, 86vw);
+  background: rgba(10, 12, 22, 0.88);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  transform: translateX(-100%);
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-sans);
+  box-shadow: 4px 0 32px rgba(0, 0, 0, 0.5);
+}
+.aubos-onb-chatfeed.open { transform: translateX(0); }
+
+.aubos-onb-chatfeed-head {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 18px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.aubos-onb-chatfeed-head strong {
+  font-size: 0.88rem; font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  letter-spacing: -0.005em;
+}
+.aubos-onb-chatfeed-head small {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.45);
+  font-feature-settings: "tnum";
+}
+.aubos-onb-chatfeed-close {
+  margin-left: auto;
+  width: 28px; height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.65);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1.1rem; line-height: 1;
+  transition: all 0.12s;
+}
+.aubos-onb-chatfeed-close:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+
+.aubos-onb-chatfeed-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px 24px;
+  display: flex; flex-direction: column; gap: 14px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+.aubos-onb-chatfeed-body::-webkit-scrollbar { width: 6px; }
+.aubos-onb-chatfeed-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+}
+
+.aubos-onb-chatfeed-empty {
+  text-align: center;
+  padding: 32px 16px;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.aubos-onb-chatfeed-msg {
+  display: flex; flex-direction: column; gap: 4px;
+  max-width: 92%;
+  animation: aubos-msg-in 0.28s ease-out;
+}
+.aubos-onb-chatfeed-msg.from-user { align-self: flex-end; align-items: flex-end; }
+.aubos-onb-chatfeed-msg.from-cleo { align-self: flex-start; align-items: flex-start; }
+
+.aubos-onb-chatfeed-msg-meta {
+  display: flex; gap: 6px; align-items: center;
+  font-size: 0.65rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
+}
+.aubos-onb-chatfeed-msg-time { color: rgba(255, 255, 255, 0.28); font-weight: 400; }
+
+.aubos-onb-chatfeed-msg-body {
+  font-size: 0.92rem;
+  line-height: 1.5;
+  padding: 10px 14px;
+  border-radius: 14px;
+  text-wrap: pretty;
+}
+.aubos-onb-chatfeed-msg.from-user .aubos-onb-chatfeed-msg-body {
+  background: rgba(96, 165, 250, 0.18);
+  border: 1px solid rgba(96, 165, 250, 0.28);
+  color: rgba(255, 255, 255, 0.96);
+  border-bottom-right-radius: 4px;
+}
+.aubos-onb-chatfeed-msg.from-cleo .aubos-onb-chatfeed-msg-body {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  color: rgba(255, 255, 255, 0.94);
+  border-bottom-left-radius: 4px;
+}
+
+@keyframes aubos-msg-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .aubos-onb-mic-btn:disabled {
@@ -1539,10 +1813,11 @@ body {
    "classy futuristic" backdrop shows through. If you ever want to put a
    GIF/image directly behind Cleo (e.g. brand-specific scene), set the
    --cleo-office-bg CSS var or VITE_CLEO_OFFICE_BG_URL. */
+/* Audio-visualizer stage — no photo backdrop. The depth comes from the
+   layered backdrop on .aubos-onb-stage itself; this just centers the
+   canvas. The canvas inside renders an audio-reactive voice orb. */
 .aubos-onb-avatar-stage {
-  background-image: var(--cleo-office-bg, none);
-  background-size: cover;
-  background-position: center;
+  background: transparent;
 }
 
 /* Edge vignette — two layers:

@@ -1,5 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
-import type { WorkStreamEvent } from "@factory/kernel/browser";
+
+// Inlined from @factory/kernel/types — that package is workspace-only in
+// the AI_Factory monorepo and not published to npm, so we mirror its
+// type here to keep this deploy repo standalone-buildable.
+type WorkStreamEventKind =
+  | "stage" | "agent" | "audit" | "qc" | "debug" | "context" | "delivery" | "scaling";
+
+interface WorkStreamEvent {
+  id: string;
+  projectId: string;
+  agentId?: string;
+  stageId?: string;
+  kind: WorkStreamEventKind;
+  status: "queued" | "running" | "blocked" | "debugging" | "passed" | "failed" | "delivered";
+  title: string;
+  message: string;
+  progress: number;
+  evidence?: Record<string, unknown>;
+  createdAt: string;
+}
 
 interface WorkStreamRow {
   id: string;

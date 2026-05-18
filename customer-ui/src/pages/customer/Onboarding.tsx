@@ -77,8 +77,7 @@ import { useCleoSTT } from "@/lib/useCleoSTT";
 import { MicPermissionGate } from "@/components/MicPermissionGate";
 import { startVoiceTurn, type VoiceTurn } from "@/lib/voiceTelemetry";
 import { DocumentDropzone } from "@/components/onboarding/DocumentDropzone";
-import { Cleo3D } from "@/components/cleo3d/Cleo3D";
-import { AvatarPicker } from "@/components/cleo3d/AvatarPicker";
+import { AudioVisualizer } from "@/components/AudioVisualizer";
 import { useTalkingCleo } from "@/lib/useTalkingCleo";
 
 interface CanvasNodeShape {
@@ -116,8 +115,15 @@ interface ChatMessage {
   created_at: string;
 }
 
-const FACTORY_URL = (import.meta.env.VITE_FACTORY_URL as string | undefined) ?? "http://localhost:7777";
-const FACTORY_TOKEN = import.meta.env.VITE_FACTORY_RUNTIME_TOKEN as string | undefined;
+// The "Send to AUBOS" action no longer hits the factory runtime directly
+// from the browser. We route through the `cleo-package` Supabase edge fn
+// which:
+//   - validates the customer's Supabase JWT
+//   - checks they own the company_id
+//   - server-to-server forwards to runtime.aubos.ai
+// This keeps the factory runtime token off the public bundle entirely.
+// VITE_FACTORY_URL / VITE_FACTORY_RUNTIME_TOKEN are intentionally NOT
+// referenced here — anything in the bundle is visible to every visitor.
 
 // Inline toast — shows a transient message in the corner. Replaces shadcn's
 // useToast hook so we don't need to pull in the whole shadcn ecosystem.
@@ -160,7 +166,8 @@ export default function CleoOnboarding(): JSX.Element {
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [bootError, setBootError] = useState<string>("");
   const [canvasOpen, setCanvasOpen] = useState<boolean>(false);
-  const [avatarPickerOpen, setAvatarPickerOpen] = useState<boolean>(false);
+  const [chatOpen, setChatOpen] = useState<boolean>(false);
+  const chatScrollRef = useRef<HTMLDivElement | null>(null);
   // Proposal-mode UI state.
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [proposalAccepting, setProposalAccepting] = useState<boolean>(false);
@@ -194,7 +201,12 @@ export default function CleoOnboarding(): JSX.Element {
     if (spokenRef.current.has(last.id)) return;
     spokenRef.current.add(last.id);
     speak(last.content);
-  }, [messages, speak]);
+    // Deliberately exclude `speak` from deps — its reference can change
+    // on every render (it has internal callbacks), and re-running this
+    // effect when speak changes would re-speak the last message. We only
+    // want to fire when a NEW message arrives.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages]);
 
   // Last assistant message — shown as a soft caption under Cleo while she
   // speaks. MUST live above the early-return guards so hook order is stable.
@@ -392,7 +404,11 @@ export default function CleoOnboarding(): JSX.Element {
   // ─── Auto-scroll chat to bottom on new messages ─────────────────────────
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length]);
+    // Also scroll the chat history panel — it has its own scroll container.
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: "smooth" });
+    }
+  }, [messages.length, chatOpen]);
 
   // ─── Send a chat message via the Edge Function ──────────────────────────
   // sendText — submits one message to cleo-onboarding-chat. Extracted so the
@@ -470,16 +486,13 @@ export default function CleoOnboarding(): JSX.Element {
   }, []);
 
   // ─── Send to AUBOS team — packages + ships to factory ───────────────────
+  //
+  // Flow: browser → cleo-package edge fn (validates JWT + ownership) →
+  // runtime.aubos.ai (Cloudflare Tunnel → factory VPS). The factory runtime
+  // token NEVER touches the bundle — it lives only as a Supabase Function
+  // Secret inside cleo-package.
   const sendToAubosTeam = useCallback(async () => {
     if (!companyId || !canvas || submitting) return;
-    if (!FACTORY_TOKEN) {
-      toast({
-        title: "Factory not configured",
-        description: "Ask your AUBOS contact to set VITE_FACTORY_URL + VITE_FACTORY_RUNTIME_TOKEN.",
-        variant: "destructive"
-      });
-      return;
-    }
     setSubmitting(true);
     try {
       // Snapshot the current chat (optimistic — realtime may not have arrived yet)
@@ -489,13 +502,12 @@ export default function CleoOnboarding(): JSX.Element {
         .eq("company_id", companyId)
         .order("created_at", { ascending: true })
         .limit(500);
-      const res = await fetch(`${FACTORY_URL}/api/cleo/package`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${FACTORY_TOKEN}`
-        },
-        body: JSON.stringify({
+
+      // supabase.functions.invoke() automatically attaches the user's JWT
+      // as `Authorization: Bearer <jwt>`. The edge fn validates it +
+      // ownership, then forwards to the factory runtime.
+      const { data, error } = await supabase.functions.invoke("cleo-package", {
+        body: {
           companyId,
           companySlug: companyWebsite ? new URL(companyWebsite.startsWith("http") ? companyWebsite : `https://${companyWebsite}`).hostname.replace(/^www\./, "").split(".")[0] : "",
           priority: "p1",
@@ -518,9 +530,10 @@ export default function CleoOnboarding(): JSX.Element {
             content: m.content,
             at: m.created_at
           }))
-        })
+        }
       });
-      if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+      if (error) throw new Error(error.message);
+      void data;
 
       // Mark canvas state
       await supabase
@@ -713,14 +726,23 @@ export default function CleoOnboarding(): JSX.Element {
 
   return (
     <div className="aubos-onb-stage">
-      {/* Top-left: subtle brand + customer chip */}
+      {/* Top-left: subtle brand + customer chip + auth menu */}
       <header className="aubos-onb-stage-top">
         <div className="aubos-onb-brand">
           <strong>AUBOS</strong>
           <small> · {proposalMode ? "proposal" : "onboarding"}</small>
         </div>
         <div className="aubos-onb-stage-customer">
-          {companyName ? <span>{companyName}</span> : null}
+          {companyName ? <span className="aubos-onb-company-chip">{companyName}</span> : null}
+          <button
+            type="button"
+            className="aubos-onb-canvas-toggle"
+            onClick={() => setChatOpen((v) => !v)}
+            aria-label="Toggle chat history"
+            title={chatOpen ? "Hide chat" : "Show chat"}
+          >
+            {messages.length} msg · {chatOpen ? "hide chat" : "show chat"}
+          </button>
           <button
             type="button"
             className="aubos-onb-canvas-toggle"
@@ -729,6 +751,18 @@ export default function CleoOnboarding(): JSX.Element {
             title={canvasOpen ? "Hide canvas" : "Show canvas"}
           >
             {(canvas.nodes ?? []).length} nodes · {canvasOpen ? "hide canvas" : "show canvas"}
+          </button>
+          <button
+            type="button"
+            className="aubos-onb-signout"
+            onClick={async () => {
+              try { await supabase.auth.signOut(); } catch { /* */ }
+              navigate("/login");
+            }}
+            title="Sign out"
+            aria-label="Sign out"
+          >
+            sign out
           </button>
         </div>
       </header>
@@ -764,9 +798,12 @@ export default function CleoOnboarding(): JSX.Element {
         </div>
       ) : null}
 
-      {/* Center stage: full-screen 3D Cleo */}
+      {/* Center stage: audio-reactive voice orb (replaces the 3D avatar).
+          Same audio plumbing under the hood — wawa-lipsync still owns the
+          AnalyserNode; AudioVisualizer just renders its frequency data as
+          radial bars + a glowing core. */}
       <div className="aubos-onb-avatar-stage" onClick={() => unlockTTS()}>
-        <Cleo3D lipsync={lipsync} className="aubos-onb-avatar-canvas" />
+        <AudioVisualizer lipsync={lipsync} isSpeaking={isSpeaking} className="aubos-onb-avatar-canvas" />
       </div>
 
       {/* Caption — last thing Cleo said, shown beneath her while talking + briefly after.
@@ -893,43 +930,44 @@ export default function CleoOnboarding(): JSX.Element {
         <div className="aubos-onb-drawer-backdrop" onClick={() => setCanvasOpen(false)} />
       ) : null}
 
-      {/* Dev-only: floating "swap avatar" button */}
-      {isDev ? (
-        <button
-          type="button"
-          onClick={() => setAvatarPickerOpen(true)}
-          style={{
-            position: "absolute",
-            bottom: 80,
-            right: 24,
-            zIndex: 8,
-            background: "rgba(0, 0, 0, 0.6)",
-            color: "rgba(255, 255, 255, 0.85)",
-            border: "1px solid rgba(255, 255, 255, 0.15)",
-            borderRadius: 8,
-            padding: "6px 12px",
-            fontFamily: "ui-monospace, monospace",
-            fontSize: "0.6rem",
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            cursor: "pointer",
-          }}
-          title="Pick a different avatar (dev)"
-        >
-          swap avatar
-        </button>
-      ) : null}
+      {/* Chat history panel — slides in from the LEFT (canvas is on the
+          right, so this gives the customer a stage where Cleo sits in the
+          middle, business map opens right, conversation log opens left).
+          Auto-scrolls to latest message via the chatScrollRef effect. */}
+      <aside className={`aubos-onb-chatfeed ${chatOpen ? "open" : ""}`}>
+        <header className="aubos-onb-chatfeed-head">
+          <strong>Conversation</strong>
+          <small>{messages.length} messages</small>
+          <button
+            type="button"
+            className="aubos-onb-chatfeed-close"
+            onClick={() => setChatOpen(false)}
+            aria-label="Close chat"
+          >×</button>
+        </header>
+        <div className="aubos-onb-chatfeed-body" ref={chatScrollRef}>
+          {messages.length === 0 ? (
+            <div className="aubos-onb-chatfeed-empty">
+              No messages yet. Start by saying hi or typing in the bar below.
+            </div>
+          ) : messages.map((m) => (
+            <div
+              key={m.id}
+              className={`aubos-onb-chatfeed-msg ${m.role === "user" ? "from-user" : "from-cleo"}`}
+            >
+              <div className="aubos-onb-chatfeed-msg-meta">
+                {m.role === "user" ? "you" : "cleo"}
+                <span className="aubos-onb-chatfeed-msg-time">
+                  {new Date(m.created_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                </span>
+              </div>
+              <div className="aubos-onb-chatfeed-msg-body">{m.content}</div>
+            </div>
+          ))}
+        </div>
+      </aside>
 
-      {/* Avatar picker iframe modal — opens only when user clicks the button. */}
-      {avatarPickerOpen ? (
-        <AvatarPicker
-          onPicked={() => {
-            // Reload so Cleo3D picks up the new URL from localStorage.
-            window.location.reload();
-          }}
-          onClose={() => setAvatarPickerOpen(false)}
-        />
-      ) : null}
+      {/* (Avatar picker removed — no 3D avatar anymore.) */}
 
       {/* Integration login rail — only in proposal mode, sits on the left edge. */}
       {proposalMode && integrationNodes.length > 0 ? (

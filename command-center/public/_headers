@@ -1,0 +1,16 @@
+# Cloudflare Pages applies these to every response from factoryadmin.aubos.ai.
+# Tighter than welcome.aubos.ai because the admin shell doesn't need:
+#   - microphone (no voice chat)
+#   - media-src blob: (no TTS audio)
+#   - wasm-unsafe-eval (no 3D)
+# Anything not explicitly allowed is denied.
+
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://jzppqxiprjsuvuyulbyj.supabase.co; font-src 'self' data:; connect-src 'self' https://jzppqxiprjsuvuyulbyj.supabase.co wss://jzppqxiprjsuvuyulbyj.supabase.co https://jzppqxiprjsuvuyulbyj.functions.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests
+  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: microphone=(), camera=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: same-site

@@ -1,14 +1,16 @@
 // MicPermissionGate — first-time microphone permission overlay (proposal §1.3 / S3).
 //
-// Rendered as an overlay (NOT as a Onboarding-replacing gate) when the
-// browser's microphone permission is still 'prompt'. Click "Allow" briefly
-// requests + releases the mic to trigger the browser's native permission
-// prompt, then dismisses. If the user denies, the overlay stays with a
-// "you can still type" CTA so onboarding isn't fully blocked.
+// Rendered as an overlay when the browser's mic permission is still 'prompt'
+// AND the user hasn't dismissed it before. Once dismissed (Allow, Skip, or
+// click-outside), the choice is persisted to localStorage so it never blocks
+// again. If the user wants to re-enable later, the mic button in the input
+// bar will trigger the native browser prompt directly.
 
 import { useEffect, useState } from "react";
 
 type Permission = "checking" | "granted" | "prompt" | "denied" | "unsupported";
+
+const DISMISSED_KEY = "cleo:mic-gate-dismissed";
 
 export function MicPermissionGate({
   onResolved,
@@ -22,6 +24,18 @@ export function MicPermissionGate({
   useEffect(() => {
     let cancelled = false;
     void (async () => {
+      // If the user has dismissed this gate before, never show it again —
+      // they can still grant mic permission via the mic button later.
+      try {
+        if (localStorage.getItem(DISMISSED_KEY) === "1") {
+          if (!cancelled) {
+            setState("granted");  // any non-blocking state
+            onResolved(false);
+          }
+          return;
+        }
+      } catch { /* private mode / SSR */ }
+
       try {
         if (!navigator.permissions || !navigator.mediaDevices?.getUserMedia) {
           if (!cancelled) setState("unsupported");
@@ -47,6 +61,12 @@ export function MicPermissionGate({
     return () => { cancelled = true; };
   }, [onResolved]);
 
+  // Persist dismissal so the gate doesn't keep coming back on every page load.
+  const dismiss = (granted: boolean) => {
+    try { localStorage.setItem(DISMISSED_KEY, "1"); } catch { /* */ }
+    onResolved(granted);
+  };
+
   const requestMic = async () => {
     setTrying(true);
     try {
@@ -54,7 +74,7 @@ export function MicPermissionGate({
       // Release immediately; useMicCapture will request again when needed.
       s.getTracks().forEach((t) => t.stop());
       setState("granted");
-      onResolved(true);
+      dismiss(true);
     } catch {
       setState("denied");
     } finally {
@@ -65,8 +85,15 @@ export function MicPermissionGate({
   if (state === "checking" || state === "granted") return null;
 
   return (
-    <div className="mic-permission-gate" role="dialog" aria-modal="true">
-      <div className="mic-permission-gate-card">
+    // Click the dark backdrop to skip — same behavior as the Skip button.
+    // Card itself stops propagation so clicking inside doesn't dismiss.
+    <div
+      className="mic-permission-gate"
+      role="dialog"
+      aria-modal="true"
+      onClick={() => dismiss(false)}
+    >
+      <div className="mic-permission-gate-card" onClick={(e) => e.stopPropagation()}>
         <h2>Let Cleo hear you?</h2>
         <p className="mic-permission-gate-body">
           {state === "denied"
@@ -89,7 +116,7 @@ export function MicPermissionGate({
           <button
             type="button"
             className="mic-permission-gate-btn secondary"
-            onClick={() => onResolved(false)}
+            onClick={() => dismiss(false)}
           >
             {state === "denied" || state === "unsupported" ? "Continue typing" : "Skip for now"}
           </button>

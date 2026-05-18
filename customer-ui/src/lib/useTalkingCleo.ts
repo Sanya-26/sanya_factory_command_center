@@ -86,6 +86,10 @@ export function useTalkingCleo(): UseTalkingCleoReturn {
       audio.pause();
       try { audio.currentTime = 0; } catch { /* not loaded */ }
     }
+    if (currentObjectUrlRef.current) {
+      URL.revokeObjectURL(currentObjectUrlRef.current);
+      currentObjectUrlRef.current = null;
+    }
     setIsSpeaking(false);
   }, []);
 
@@ -95,9 +99,19 @@ export function useTalkingCleo(): UseTalkingCleoReturn {
       const seq = ++speakSeqRef.current;
       const { audio } = ensureInit();
 
-      // Cancel anything currently playing.
+      // Stop anything currently playing. We DO NOT call audio.load() or
+      // removeAttribute("src") here — that resets the audio element's
+      // internal media pipeline, which severs the MediaElementAudioSourceNode
+      // that wawa-lipsync uses for FFT analysis (= broken lipsync). Just
+      // pausing + revoking the URL is enough; setting audio.src in
+      // streamIntoAudioElement implicitly stops the prior playback.
       audio.pause();
-      try { audio.currentTime = 0; } catch { /* */ }
+      try { audio.currentTime = 0; } catch { /* not loaded */ }
+      if (currentObjectUrlRef.current) {
+        URL.revokeObjectURL(currentObjectUrlRef.current);
+        currentObjectUrlRef.current = null;
+      }
+      setIsSpeaking(false);
 
       try {
         // Get the user's current session JWT — required by cleo-tts.
@@ -155,7 +169,42 @@ export function useTalkingCleo(): UseTalkingCleoReturn {
     [ensureInit]
   );
 
-  const unlock = useCallback(() => { ensureInit(); }, [ensureInit]);
+  // Chrome's autoplay policy refuses audio.play() until the user has had a
+  // real interaction with the page. unlock() MUST be wired to a user-gesture
+  // handler (onClick, onTap, onKeyDown) and run synchronously inside that
+  // handler — async work between the gesture and the play() call invalidates
+  // the user-activation stamp.
+  //
+  // What we do here:
+  //   1. ensureInit() creates the <audio> + the Lipsync engine (which builds
+  //      a Web Audio AudioContext under the hood).
+  //   2. Play a silent dummy synchronously, then pause — this "primes" the
+  //      audio element so later play() calls aren't blocked.
+  //   3. Resume the AudioContext if it's in 'suspended' state (it always is
+  //      pre-gesture).
+  // After this, every subsequent speak() can call audio.play() without
+  // hitting NotAllowedError.
+  const unlock = useCallback(() => {
+    const { audio, ls } = ensureInit();
+    // Sync play() inside the gesture context; ignore the returned promise's
+    // rejection (it can reject if user-activation was lost, which is fine —
+    // the next gesture will retry).
+    audio.muted = true;
+    const p = audio.play();
+    if (p && typeof p.then === "function") {
+      p.then(() => {
+        audio.pause();
+        audio.muted = false;
+      }).catch(() => { audio.muted = false; });
+    } else {
+      audio.muted = false;
+    }
+    // Resume the Web Audio AudioContext that wawa-lipsync owns.
+    const ac = (ls as unknown as { audioContext?: AudioContext })?.audioContext;
+    if (ac && ac.state === "suspended") {
+      void ac.resume();
+    }
+  }, [ensureInit]);
 
   // Cleanup on unmount.
   useEffect(() => {
@@ -168,6 +217,30 @@ export function useTalkingCleo(): UseTalkingCleoReturn {
       } catch { /* */ }
     };
   }, []);
+
+  // Global one-shot interaction listener — any click / tap / key press
+  // ANYWHERE on the page primes the audio system. Without this, the user
+  // has to remember to tap the avatar specifically before audio works.
+  // Listener removes itself after the first fire (passive, never blocks).
+  useEffect(() => {
+    let fired = false;
+    const handler = () => {
+      if (fired) return;
+      fired = true;
+      try { unlock(); } catch { /* swallow */ }
+      window.removeEventListener("pointerdown", handler);
+      window.removeEventListener("keydown", handler);
+      window.removeEventListener("touchstart", handler);
+    };
+    window.addEventListener("pointerdown", handler, { passive: true });
+    window.addEventListener("keydown", handler, { passive: true });
+    window.addEventListener("touchstart", handler, { passive: true });
+    return () => {
+      window.removeEventListener("pointerdown", handler);
+      window.removeEventListener("keydown", handler);
+      window.removeEventListener("touchstart", handler);
+    };
+  }, [unlock]);
 
   return { lipsync, isSpeaking, speak, stop, unlock };
 }

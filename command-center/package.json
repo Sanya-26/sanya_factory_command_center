@@ -9,7 +9,6 @@
     "typecheck": "tsc -b"
   },
   "dependencies": {
-    "@factory/kernel": "0.1.0",
     "@supabase/supabase-js": "^2.105.3",
     "@xyflow/react": "^12.10.2",
     "dagre": "^0.8.5",
@@ -20,6 +19,7 @@
   },
   "devDependencies": {
     "@types/dagre": "^0.7.54",
+    "@types/node": "^25.8.0",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^6.0.1",

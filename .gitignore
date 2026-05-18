@@ -9,3 +9,10 @@ dist/
 *.log
 .claude/
 src-tauri/target/
+
+# tsc -b build artifacts (emit alongside .tsx; we don't commit them)
+**/src/**/*.tsx.d.ts
+**/command-center/src/App.d.ts
+**/command-center/src/App.js
+**/command-center/vite.config.d.ts
+**/command-center/vite.config.js

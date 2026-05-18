@@ -14,7 +14,7 @@
 
 import { Component, ReactNode, Suspense, useEffect, useMemo, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { useGLTF, Environment } from "@react-three/drei";
+import { useGLTF } from "@react-three/drei";
 import { Lipsync, VISEMES } from "wawa-lipsync";
 import * as THREE from "three";
 
@@ -117,6 +117,13 @@ function Avatar({ lipsync }: AvatarProps): JSX.Element {
   // Idle subtle breathing — small chest scale + slow head sway.
   const headRef = useRef<THREE.Object3D | null>(null);
 
+  // Eye blink state — schedules a blink every 2.5-5s, animates eyesClosed
+  // (or eyeBlinkLeft/Right) from 0→1→0 over ~140ms (realistic blink speed).
+  // Triangle envelope: fast-up, fast-down. Refs because useFrame can't
+  // hold state across frames.
+  const nextBlinkAtRef = useRef<number>(performance.now() + 1500 + Math.random() * 2000);
+  const blinkStartRef = useRef<number | null>(null);
+
   // Auto-frame using the avatar's actual bounding box:
   //   1. Compute the visible (mesh) bounding box AFTER updateMatrixWorld
   //   2. Scale the avatar to a fixed target height (1.72m) so cm-unit
@@ -203,6 +210,44 @@ function Avatar({ lipsync }: AvatarProps): JSX.Element {
         }
       }
     }
+
+    // ── Eye blink ──────────────────────────────────────────────────────
+    // Triggered ~every 2.5-5s; animates eyesClosed (or eyeBlink*) over
+    // ~140ms with a triangle envelope (fast close, fast open).
+    const now = performance.now();
+    if (blinkStartRef.current === null && now >= nextBlinkAtRef.current) {
+      blinkStartRef.current = now;
+    }
+    let blinkValue = 0;
+    if (blinkStartRef.current !== null) {
+      const BLINK_MS = 140;
+      const elapsed = now - blinkStartRef.current;
+      if (elapsed < BLINK_MS) {
+        const phase = elapsed / BLINK_MS;          // 0..1
+        blinkValue = phase < 0.5 ? phase * 2 : 2 - phase * 2;  // 0→1→0 triangle
+      } else {
+        blinkStartRef.current = null;
+        nextBlinkAtRef.current = now + 2500 + Math.random() * 2500;
+      }
+    }
+    if (blinkValue > 0 || blinkStartRef.current !== null) {
+      for (const mesh of meshes) {
+        const dict = mesh.morphTargetDictionary;
+        const inf = mesh.morphTargetInfluences;
+        if (!dict || !inf) continue;
+        // Try common blink morph target names — eyesClosed is RPM standard,
+        // eyeBlinkLeft + eyeBlinkRight are ARKit standard.
+        const idxClosed = dict["eyesClosed"] ?? dict["EyesClosed"];
+        if (idxClosed !== undefined) {
+          inf[idxClosed] = blinkValue;
+        } else {
+          const l = dict["eyeBlinkLeft"] ?? dict["eyeBlink_L"];
+          const r = dict["eyeBlinkRight"] ?? dict["eyeBlink_R"];
+          if (l !== undefined) inf[l] = blinkValue;
+          if (r !== undefined) inf[r] = blinkValue;
+        }
+      }
+    }
   });
 
   // Auto-fit: scaled to 1.72m and translated so feet sit at y=0.
@@ -259,7 +304,10 @@ export function Cleo3D({ lipsync, className }: Cleo3DProps): JSX.Element {
           color="#c9b5ff"
         />
         <Suspense fallback={null}>
-          <Environment preset="studio" />
+          {/* drei's <Environment preset="studio" /> was here, but it fetches
+              an HDR from a 3rd-party CDN which our strict CSP blocks. The
+              3-point directional lighting above (key/fill/rim) gives us
+              flattering studio coverage without an external dependency. */}
           <Avatar lipsync={lipsync} />
         </Suspense>
       </Canvas>
