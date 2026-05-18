@@ -166,7 +166,6 @@ export default function CleoOnboarding(): JSX.Element {
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [bootError, setBootError] = useState<string>("");
   const [canvasOpen, setCanvasOpen] = useState<boolean>(false);
-  const [chatOpen, setChatOpen] = useState<boolean>(false);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   // Proposal-mode UI state.
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -408,7 +407,7 @@ export default function CleoOnboarding(): JSX.Element {
     if (chatScrollRef.current) {
       chatScrollRef.current.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: "smooth" });
     }
-  }, [messages.length, chatOpen]);
+  }, [messages.length]);
 
   // ─── Send a chat message via the Edge Function ──────────────────────────
   // sendText — submits one message to cleo-onboarding-chat. Extracted so the
@@ -726,31 +725,39 @@ export default function CleoOnboarding(): JSX.Element {
 
   return (
     <div className="aubos-onb-stage">
-      {/* Top-left: subtle brand + customer chip + auth menu */}
-      <header className="aubos-onb-stage-top">
+      {/* ─── Top bar ─────────────────────────────────────────────────
+          Minimal: brand on the left, primary action ("Send to AUBOS")
+          + map toggle + sign-out on the right. Send-to-AUBOS lives up
+          here (not in the input bar) because it's a flow-end action,
+          not a per-message action. */}
+      <header className="aubos-onb-header">
         <div className="aubos-onb-brand">
           <strong>AUBOS</strong>
-          <small> · {proposalMode ? "proposal" : "onboarding"}</small>
+          <small>· {proposalMode ? "proposal" : "onboarding"}</small>
+          {companyName ? (
+            <span className="aubos-onb-company-chip">{companyName}</span>
+          ) : null}
         </div>
-        <div className="aubos-onb-stage-customer">
-          {companyName ? <span className="aubos-onb-company-chip">{companyName}</span> : null}
+        <div className="aubos-onb-header-actions">
           <button
             type="button"
-            className="aubos-onb-canvas-toggle"
-            onClick={() => setChatOpen((v) => !v)}
-            aria-label="Toggle chat history"
-            title={chatOpen ? "Hide chat" : "Show chat"}
+            className="aubos-onb-header-link"
+            onClick={() => setCanvasOpen((v) => !v)}
+            title={canvasOpen ? "Hide business map" : "Show business map"}
           >
-            {messages.length} msg · {chatOpen ? "hide chat" : "show chat"}
+            <span className="aubos-onb-header-link-num">{(canvas.nodes ?? []).length}</span>
+            <span>{canvasOpen ? "hide map" : "map"}</span>
           </button>
           <button
             type="button"
-            className="aubos-onb-canvas-toggle"
-            onClick={() => setCanvasOpen((v) => !v)}
-            aria-label="Toggle canvas"
-            title={canvasOpen ? "Hide canvas" : "Show canvas"}
+            className="aubos-onb-send-team-btn"
+            onClick={() => void sendToAubosTeam()}
+            disabled={submitting || sentToAubos || (canvas.nodes?.length ?? 0) === 0}
+            title={sentToAubos ? "Already sent" : "Send your business map to the AUBOS team"}
           >
-            {(canvas.nodes ?? []).length} nodes · {canvasOpen ? "hide canvas" : "show canvas"}
+            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> :
+             sentToAubos ? <><Package2 className="h-[14px] w-[14px]" /> Sent</> :
+             <><Package2 className="h-[14px] w-[14px]" /> Send to AUBOS</>}
           </button>
           <button
             type="button"
@@ -767,7 +774,7 @@ export default function CleoOnboarding(): JSX.Element {
         </div>
       </header>
 
-      {/* Proposal banner — shown above Cleo when the council has approved a map */}
+      {/* ─── Proposal banner (only when a council proposal is ready) ─── */}
       {proposalMode && !sentToAubos ? (
         <div className="aubos-onb-proposal-banner">
           <div className="aubos-onb-proposal-stats">
@@ -783,11 +790,6 @@ export default function CleoOnboarding(): JSX.Element {
             className="aubos-onb-proposal-accept"
             disabled={acceptDisabled}
             onClick={() => void acceptProposal()}
-            title={
-              missingIntegrations.length > 0
-                ? `Connect first: ${missingIntegrations.map((m) => m.label).join(", ")}`
-                : "Build my AI"
-            }
           >
             {proposalAccepting
               ? <Loader2 className="h-4 w-4 animate-spin" />
@@ -798,89 +800,101 @@ export default function CleoOnboarding(): JSX.Element {
         </div>
       ) : null}
 
-      {/* Center stage: audio-reactive voice orb (replaces the 3D avatar).
-          Same audio plumbing under the hood — wawa-lipsync still owns the
-          AnalyserNode; AudioVisualizer just renders its frequency data as
-          radial bars + a glowing core. */}
-      <div className="aubos-onb-avatar-stage" onClick={() => unlockTTS()}>
-        <AudioVisualizer lipsync={lipsync} isSpeaking={isSpeaking} className="aubos-onb-avatar-canvas" />
-      </div>
+      {/* ─── Conversation column (Pi/Inflection layout) ───────────────
+          Single 720px max-width column, centered horizontally. Three
+          stacked sections: orb on top, message feed in the middle,
+          input pinned at the bottom of the column. */}
+      <main className="aubos-onb-shell" onClick={() => unlockTTS()}>
 
-      {/* Caption — last thing Cleo said, shown beneath her while talking + briefly after.
-          While the mic is open and the user is mid-utterance, the live partial
-          transcript replaces the caption so the customer sees themselves
-          being heard. */}
-      {micEnabled && stt.partial ? (
-        <div className="aubos-onb-caption transcript">
-          <span>{stt.partial}…</span>
-        </div>
-      ) : lastCleoMessage ? (
-        <div className={`aubos-onb-caption ${isSpeaking ? "speaking" : ""}`}>
-          <span>{lastCleoMessage.content}</span>
-        </div>
-      ) : (
-        <div className="aubos-onb-caption">
-          <span className="hint">Tap anywhere then start typing — Cleo's listening.</span>
-        </div>
-      )}
+        {/* Voice orb — smaller than before (~30vh), provides focal
+            point + visual indicator that she's listening / speaking. */}
+        <section className="aubos-onb-orb-wrap" aria-hidden="true">
+          <AudioVisualizer lipsync={lipsync} isSpeaking={isSpeaking} className="aubos-onb-orb-canvas" />
+        </section>
 
-      {/* First-time microphone permission overlay. Renders only when not yet
-          resolved by the browser. Once resolved (granted or skipped), the
-          mic button in the input bar drives capture. */}
+        {/* Message feed — full conversation history as bubbles. User
+            right-aligned violet, Cleo left-aligned neutral. Auto-scrolls
+            on new messages via chatScrollRef. */}
+        <section className="aubos-onb-feed" ref={chatScrollRef}>
+          {messages.length === 0 ? (
+            <div className="aubos-onb-feed-empty">
+              Say hi or type a message — Cleo's listening.
+            </div>
+          ) : messages.map((m) => (
+            <div
+              key={m.id}
+              className={`aubos-onb-msg ${m.role === "user" ? "from-user" : "from-cleo"}`}
+            >
+              <div className="aubos-onb-msg-body">{m.content}</div>
+              <div className="aubos-onb-msg-time">
+                {new Date(m.created_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+              </div>
+            </div>
+          ))}
+          {/* Live partial transcript — appears as an in-progress user message */}
+          {micEnabled && stt.partial ? (
+            <div className="aubos-onb-msg from-user partial">
+              <div className="aubos-onb-msg-body">{stt.partial}<span className="aubos-onb-msg-caret">…</span></div>
+            </div>
+          ) : null}
+          {/* Typing indicator — appears as an in-progress Cleo message */}
+          {sending ? (
+            <div className="aubos-onb-msg from-cleo typing">
+              <div className="aubos-onb-msg-body">
+                <span className="aubos-onb-typing-dot" />
+                <span className="aubos-onb-typing-dot" />
+                <span className="aubos-onb-typing-dot" />
+              </div>
+            </div>
+          ) : null}
+          <div ref={chatBottomRef} />
+        </section>
+
+        {/* Input — bottom of the conversation column. NOT absolutely
+            positioned anymore; flows naturally inside the shell. */}
+        <footer className="aubos-onb-input-bar">
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void sendMessage();
+              }
+            }}
+            placeholder={sending ? "Cleo is thinking…" : "Message Cleo…"}
+            disabled={sending || sentToAubos}
+            rows={1}
+          />
+          <button
+            type="button"
+            onClick={() => void toggleMic()}
+            disabled={sending || sentToAubos}
+            className={`aubos-onb-mic-btn ${micEnabled ? "active" : ""}`}
+            aria-label={micEnabled ? "Stop listening" : "Talk to Cleo"}
+            title={micEnabled ? "Stop listening" : "Talk to Cleo"}
+          >
+            {micEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
+          </button>
+          <button
+            type="button"
+            onClick={() => void sendMessage()}
+            disabled={sending || sentToAubos || !input.trim()}
+            className="aubos-onb-send-btn"
+            aria-label="Send"
+          >
+            {sending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-[18px] w-[18px]" />}
+          </button>
+        </footer>
+      </main>
+
+      {/* First-time mic permission overlay — persists dismissal */}
       {!micPermissionResolved ? (
         <MicPermissionGate onResolved={() => setMicPermissionResolved(true)} />
       ) : null}
 
-      {/* S4: document dropzone — always-visible footer surface. Accepts any
-          file type; Cleo references readable ones in her next turn. */}
+      {/* Document drop zone — floating left-bottom corner */}
       <DocumentDropzone companyId={companyId} />
-
-      {/* Chat input — pinned to bottom, semi-transparent */}
-      <div className="aubos-onb-input-bar">
-        <textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              void sendMessage();
-            }
-          }}
-          placeholder={sending ? "Cleo is thinking…" : "Tell Cleo about your business · ⏎ to send"}
-          disabled={sending || sentToAubos}
-          rows={1}
-        />
-        <button
-          type="button"
-          onClick={() => void toggleMic()}
-          disabled={sending || sentToAubos}
-          className={`aubos-onb-mic-btn ${micEnabled ? "active" : ""}`}
-          aria-label={micEnabled ? "Stop listening" : "Talk to Cleo"}
-          title={micEnabled ? "Stop listening" : "Talk to Cleo"}
-        >
-          {micEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
-        </button>
-        <button
-          type="button"
-          onClick={() => void sendMessage()}
-          disabled={sending || sentToAubos || !input.trim()}
-          className="aubos-onb-send-btn"
-          aria-label="Send"
-        >
-          {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-        </button>
-        <button
-          type="button"
-          className="aubos-onb-send-team-btn"
-          onClick={() => void sendToAubosTeam()}
-          disabled={submitting || sentToAubos || (canvas.nodes?.length ?? 0) === 0}
-          title={sentToAubos ? "Already sent" : "Send your business map to the AUBOS team"}
-        >
-          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> :
-           sentToAubos ? <><Package2 className="h-4 w-4 mr-1" /> sent</> :
-           <><Package2 className="h-4 w-4 mr-1" /> send to AUBOS</>}
-        </button>
-      </div>
 
       {/* Canvas drawer — slides in from the right */}
       <aside className={`aubos-onb-drawer ${canvasOpen ? "open" : ""}`}>
@@ -930,44 +944,9 @@ export default function CleoOnboarding(): JSX.Element {
         <div className="aubos-onb-drawer-backdrop" onClick={() => setCanvasOpen(false)} />
       ) : null}
 
-      {/* Chat history panel — slides in from the LEFT (canvas is on the
-          right, so this gives the customer a stage where Cleo sits in the
-          middle, business map opens right, conversation log opens left).
-          Auto-scrolls to latest message via the chatScrollRef effect. */}
-      <aside className={`aubos-onb-chatfeed ${chatOpen ? "open" : ""}`}>
-        <header className="aubos-onb-chatfeed-head">
-          <strong>Conversation</strong>
-          <small>{messages.length} messages</small>
-          <button
-            type="button"
-            className="aubos-onb-chatfeed-close"
-            onClick={() => setChatOpen(false)}
-            aria-label="Close chat"
-          >×</button>
-        </header>
-        <div className="aubos-onb-chatfeed-body" ref={chatScrollRef}>
-          {messages.length === 0 ? (
-            <div className="aubos-onb-chatfeed-empty">
-              No messages yet. Start by saying hi or typing in the bar below.
-            </div>
-          ) : messages.map((m) => (
-            <div
-              key={m.id}
-              className={`aubos-onb-chatfeed-msg ${m.role === "user" ? "from-user" : "from-cleo"}`}
-            >
-              <div className="aubos-onb-chatfeed-msg-meta">
-                {m.role === "user" ? "you" : "cleo"}
-                <span className="aubos-onb-chatfeed-msg-time">
-                  {new Date(m.created_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
-                </span>
-              </div>
-              <div className="aubos-onb-chatfeed-msg-body">{m.content}</div>
-            </div>
-          ))}
-        </div>
-      </aside>
-
-      {/* (Avatar picker removed — no 3D avatar anymore.) */}
+      {/* (Old side-panel chat history removed — the main column IS the
+           chat history now. The canvas drawer below still slides in for
+           the business map on demand.) */}
 
       {/* Integration login rail — only in proposal mode, sits on the left edge. */}
       {proposalMode && integrationNodes.length > 0 ? (

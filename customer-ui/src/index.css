@@ -4,12 +4,33 @@
 
 :root {
   color-scheme: dark;
-  /* Typography tokens — used across the onboarding chrome. Inter is loaded
-     from Google Fonts in index.html; system fonts are the fallback chain
-     if the network is slow or blocked. Mono is reserved for technical
-     tags / IDs / measurements where character alignment matters. */
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, system-ui, sans-serif;
+  /* Typography — Geist Sans (2026-grade, sharper than Inter at body sizes). */
+  --font-sans: "Geist", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, "Cascadia Mono", monospace;
+
+  /* Tokens — black + silver/grey system (chrome-on-obsidian).
+     Single accent is a polished silver. Surfaces stay true-black with
+     near-white borders + grey text. No colored hues. */
+  --accent:        rgba(220, 220, 224, 1);    /* chrome silver */
+  --accent-soft:   rgba(220, 220, 224, 0.14); /* silver glow */
+  --accent-fg:     #0a0a0a;                   /* deep black on silver */
+
+  --surface-0:     rgba(0, 0, 0, 1);          /* true black base */
+  --surface-1:     rgba(18, 18, 20, 0.78);    /* lifted panel — graphite */
+  --surface-2:     rgba(255, 255, 255, 0.040);/* ghost button */
+  --surface-hi:    rgba(255, 255, 255, 0.075);/* button hover */
+
+  --border-soft:   rgba(255, 255, 255, 0.06);
+  --border-mid:    rgba(255, 255, 255, 0.11);
+  --border-strong: rgba(255, 255, 255, 0.22);
+
+  --fg-strong:     rgba(240, 240, 242, 0.96); /* near-white */
+  --fg:            rgba(220, 222, 226, 0.85); /* silver-grey body */
+  --fg-muted:      rgba(180, 182, 188, 0.55); /* muted silver */
+
+  /* Easing — per emil-design-eng: never CSS default ease, always strong ease-out */
+  --ease-out:      cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-press:    cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 html, body, #root {
@@ -19,8 +40,8 @@ html, body, #root {
 }
 
 body {
-  background: #050505;
-  color: #ededed;
+  background: #000000;
+  color: var(--fg);
   font-family: var(--font-sans);
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";  /* Inter alt characters: sharper l, alt 1, alt 4, simpler g */
   -webkit-font-smoothing: antialiased;
@@ -443,21 +464,21 @@ body {
   position: fixed;
   inset: 0;
   background:
-    /* Halo behind the voice orb — soft white-purple bloom anchoring the focal point */
-    radial-gradient(ellipse 38% 32% at 50% 48%, rgba(196, 181, 253, 0.20), transparent 72%),
-    radial-gradient(ellipse 28% 22% at 50% 48%, rgba(255, 255, 255, 0.08), transparent 65%),
-    /* Diagonal aurora blooms — these animate via the keyframes below */
-    radial-gradient(ellipse 60% 50% at 22% 28%, rgba(139, 92, 246, 0.28), transparent 70%),
-    radial-gradient(ellipse 60% 50% at 78% 72%, rgba(56, 189, 248, 0.22), transparent 70%),
-    /* Atmospheric bands — top has the cooler tone, bottom has warmth */
-    linear-gradient(to bottom, rgba(8, 10, 22, 0.0) 0%, rgba(8, 10, 22, 0.4) 100%),
+    /* Halo behind the voice orb — soft chrome bloom anchoring the focal point */
+    radial-gradient(ellipse 38% 32% at 50% 48%, rgba(240, 240, 245, 0.16), transparent 72%),
+    radial-gradient(ellipse 28% 22% at 50% 48%, rgba(255, 255, 255, 0.06), transparent 65%),
+    /* Diagonal silver-grey washes — pure monochrome, no hue */
+    radial-gradient(ellipse 60% 50% at 22% 28%, rgba(200, 200, 208, 0.10), transparent 70%),
+    radial-gradient(ellipse 60% 50% at 78% 72%, rgba(220, 220, 226, 0.08), transparent 70%),
+    /* Atmospheric vignette — pushes the edges into pure black */
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.0) 0%, rgba(0, 0, 0, 0.45) 100%),
     /* Subtle scan line at the focal mid-height */
-    linear-gradient(to bottom, transparent 49.6%, rgba(255, 255, 255, 0.04) 50%, transparent 50.4%),
-    /* Tech-surface grid, very faint */
-    linear-gradient(to right,  rgba(96, 165, 250, 0.02) 1px, transparent 1px) 0 0 / 96px 96px,
-    linear-gradient(to bottom, rgba(96, 165, 250, 0.02) 1px, transparent 1px) 0 0 / 96px 96px,
-    /* True deep base — radial darkens to near-black at the corners */
-    radial-gradient(ellipse 90% 90% at 50% 50%, #0a0c1a 0%, #04050a 90%);
+    linear-gradient(to bottom, transparent 49.6%, rgba(255, 255, 255, 0.035) 50%, transparent 50.4%),
+    /* Tech-surface grid, very faint silver lines */
+    linear-gradient(to right,  rgba(255, 255, 255, 0.020) 1px, transparent 1px) 0 0 / 96px 96px,
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.020) 1px, transparent 1px) 0 0 / 96px 96px,
+    /* True-black radial — corners go to absolute black */
+    radial-gradient(ellipse 90% 90% at 50% 50%, #0d0d0e 0%, #000000 90%);
   background-attachment: fixed;
   background-size:
     100% 100%, 100% 100%,
@@ -501,14 +522,14 @@ body {
   z-index: 0;
   background-image:
     radial-gradient(1px 1px at 12% 22%, rgba(255, 255, 255, 0.55), transparent 100%),
-    radial-gradient(1.5px 1.5px at 87% 15%, rgba(139, 92, 246, 0.65), transparent 100%),
-    radial-gradient(1px 1px at 72% 68%, rgba(56, 189, 248, 0.55), transparent 100%),
-    radial-gradient(2px 2px at 28% 78%, rgba(255, 255, 255, 0.35), transparent 100%),
-    radial-gradient(1px 1px at 94% 82%, rgba(168, 85, 247, 0.5), transparent 100%),
-    radial-gradient(1.5px 1.5px at 6% 58%, rgba(96, 165, 250, 0.45), transparent 100%),
-    radial-gradient(1px 1px at 48% 10%, rgba(255, 255, 255, 0.4), transparent 100%),
-    radial-gradient(1px 1px at 38% 45%, rgba(196, 181, 253, 0.5), transparent 100%),
-    radial-gradient(1.5px 1.5px at 65% 35%, rgba(255, 255, 255, 0.3), transparent 100%);
+    radial-gradient(1.5px 1.5px at 87% 15%, rgba(220, 220, 226, 0.55), transparent 100%),
+    radial-gradient(1px 1px at 72% 68%, rgba(255, 255, 255, 0.45), transparent 100%),
+    radial-gradient(2px 2px at 28% 78%, rgba(240, 240, 245, 0.35), transparent 100%),
+    radial-gradient(1px 1px at 94% 82%, rgba(200, 200, 208, 0.45), transparent 100%),
+    radial-gradient(1.5px 1.5px at 6% 58%, rgba(255, 255, 255, 0.40), transparent 100%),
+    radial-gradient(1px 1px at 48% 10%, rgba(255, 255, 255, 0.40), transparent 100%),
+    radial-gradient(1px 1px at 38% 45%, rgba(240, 240, 245, 0.45), transparent 100%),
+    radial-gradient(1.5px 1.5px at 65% 35%, rgba(255, 255, 255, 0.30), transparent 100%);
   animation: aubos-stage-drift 90s ease-in-out infinite alternate;
 }
 
@@ -518,7 +539,192 @@ body {
 }
 
 /* top status bar */
-/* Top status bar — uses Inter, refined sizing scale, sharper chrome */
+/* ━━━ NEW Pi-style column layout ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Header (top, full-width) + shell (centered 720px column) + canvas
+   drawer (slides in from right). Replaces the old absolute-positioned
+   floating-orb + floating-caption + bottom-bar layout. */
+
+.aubos-onb-header {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 28px;
+  font-family: var(--font-sans);
+}
+.aubos-onb-header .aubos-onb-brand {
+  display: flex; align-items: baseline; gap: 10px;
+  font-size: 0.78rem;
+}
+.aubos-onb-header .aubos-onb-brand strong {
+  font-size: 0.85rem; font-weight: 600;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--fg-strong);
+}
+.aubos-onb-header .aubos-onb-brand small {
+  font-size: 0.7rem; color: var(--fg-muted);
+  letter-spacing: 0.05em;
+}
+.aubos-onb-header-actions {
+  display: flex; align-items: center; gap: 8px;
+}
+.aubos-onb-header-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 36px;
+  padding: 0 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-mid);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 160ms var(--ease-out);
+}
+.aubos-onb-header-link:hover {
+  background: var(--surface-hi);
+  border-color: var(--border-strong);
+  color: var(--fg-strong);
+}
+.aubos-onb-header-link-num {
+  font-feature-settings: "tnum";
+  color: var(--fg-muted);
+}
+
+/* Conversation shell — centered single column, max 760px, fills the
+   available vertical space below the header. Three stacked sections:
+   orb-wrap (top), feed (middle, scrollable), input-bar (bottom). */
+.aubos-onb-shell {
+  position: absolute;
+  top: 76px; bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 760px;
+  padding: 0 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 5;
+  font-family: var(--font-sans);
+}
+
+.aubos-onb-orb-wrap {
+  flex-shrink: 0;
+  height: clamp(180px, 28vh, 280px);
+  position: relative;
+}
+.aubos-onb-orb-canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.aubos-onb-feed {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 4px 12px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+.aubos-onb-feed::-webkit-scrollbar { width: 6px; }
+.aubos-onb-feed::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.10);
+  border-radius: 3px;
+}
+
+.aubos-onb-feed-empty {
+  margin: auto;
+  padding: 24px;
+  color: var(--fg-muted);
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+/* Message bubbles — user right-aligned (violet tint), Cleo left-aligned
+   (neutral surface). 80% max-width so bubbles don't span the whole row. */
+.aubos-onb-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 80%;
+  animation: aubos-msg-pop 280ms var(--ease-out) both;
+}
+.aubos-onb-msg.from-user { align-self: flex-end; align-items: flex-end; }
+.aubos-onb-msg.from-cleo { align-self: flex-start; align-items: flex-start; }
+
+.aubos-onb-msg-body {
+  font-size: 0.95rem;
+  line-height: 1.55;
+  font-weight: 400;
+  letter-spacing: -0.005em;
+  padding: 11px 16px;
+  border-radius: 18px;
+  white-space: pre-wrap;
+  text-wrap: pretty;
+}
+.aubos-onb-msg.from-user .aubos-onb-msg-body {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-bottom-right-radius: 6px;
+}
+.aubos-onb-msg.from-cleo .aubos-onb-msg-body {
+  background: var(--surface-2);
+  color: var(--fg-strong);
+  border: 1px solid var(--border-soft);
+  border-bottom-left-radius: 6px;
+}
+.aubos-onb-msg.from-user.partial .aubos-onb-msg-body {
+  background: rgba(220, 220, 224, 0.55);
+  font-style: italic;
+}
+.aubos-onb-msg-time {
+  font-size: 0.7rem;
+  color: var(--fg-muted);
+  padding: 0 6px;
+  font-feature-settings: "tnum";
+}
+.aubos-onb-msg-caret {
+  display: inline-block;
+  margin-left: 2px;
+  animation: aubos-caret-blink 1.2s ease-in-out infinite;
+}
+
+/* Cleo "thinking" — three pulsing dots */
+.aubos-onb-msg.typing .aubos-onb-msg-body {
+  display: flex; gap: 4px; align-items: center;
+  min-height: 18px;
+}
+.aubos-onb-typing-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--fg-muted);
+  animation: aubos-typing-bounce 1.4s ease-in-out infinite;
+}
+.aubos-onb-typing-dot:nth-child(2) { animation-delay: 0.16s; }
+.aubos-onb-typing-dot:nth-child(3) { animation-delay: 0.32s; }
+
+@keyframes aubos-msg-pop {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes aubos-caret-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.3; }
+}
+@keyframes aubos-typing-bounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+  40%           { transform: translateY(-5px); opacity: 1; }
+}
+
+/* legacy: old stage-top class kept as dead-CSS alias to avoid breaking
+   other surfaces that might still reference it. */
 .aubos-onb-stage-top {
   position: absolute;
   top: 0; left: 0; right: 0;
@@ -644,128 +850,188 @@ body {
   font-style: normal;
 }
 .aubos-onb-caption.speaking span {
-  border-color: rgba(96, 165, 250, 0.45);
-  box-shadow: 0 0 32px rgba(96, 165, 250, 0.22);
+  border-color: rgba(220, 220, 224, 0.45);
+  box-shadow: 0 0 32px rgba(220, 220, 224, 0.20);
 }
 .aubos-onb-caption.transcript span {
   color: rgba(255, 255, 255, 0.72);
   font-style: italic;
 }
 
-/* Bottom input bar — Apple "liquid glass" treatment.
-   Layers, in order, are critical for the look:
-     1. Translucent base color (very thin so the backdrop bleeds through)
-     2. Heavy backdrop-filter blur + saturate (the actual frosted-glass effect)
-     3. A subtle inner highlight gradient (top edge brighter — mimics glass refraction)
-     4. A 1px border that's NOT a flat color — top half lighter than bottom (mimics
-        light hitting a curved glass edge)
-     5. A drop shadow + a separate inset shadow for the floating feel
-   The whole thing reads as a piece of glass hovering above the stage. */
+/* ━━━ Chat input — 2026 spec ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Per impeccable + taste-skill: NO frosted glass (artificial cliché), NO
+   gradient pills, NO Inter, NO black shadow. Solid surface tint, inner
+   1px refraction highlight, tinted shadow that picks up the accent hue,
+   single desaturated accent, staggered entry choreography.
+   ─────────────────────────────────────────────────────────────────── */
 .aubos-onb-input-bar {
-  position: absolute;
-  bottom: 28px;
-  left: 50%; transform: translateX(-50%);
+  /* Flows inside .aubos-onb-shell now — no absolute positioning */
+  position: relative;
+  flex-shrink: 0;
   display: flex;
-  gap: 10px;
-  align-items: center;
-  width: calc(100% - 56px);
-  max-width: 780px;
-  z-index: 6;
+  gap: 6px;
+  align-items: flex-end;
+  width: 100%;
+  padding: 6px 6px 6px 22px;
 
-  background:
-    /* Inner top-edge highlight — fakes the bright refraction line on glass */
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0) 40%),
-    /* Base translucent tint */
-    rgba(20, 24, 38, 0.42);
-  backdrop-filter: blur(40px) saturate(180%) brightness(1.05);
-  -webkit-backdrop-filter: blur(40px) saturate(180%) brightness(1.05);
-
-  /* Two-tone border — lighter at top, darker at bottom, gives the 3D
-     "glass lozenge" feel rather than a flat outlined rectangle. */
-  border: 1px solid transparent;
-  border-image: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.04)) 1;
-  border-radius: 20px;
-
-  padding: 12px;
+  border-radius: 28px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-mid);
   font-family: var(--font-sans);
 
-  /* Floating shadow + inner glow */
+  /* Tinted shadow (accent hue, not black) + 1px inner refraction highlight */
   box-shadow:
-    0 24px 64px -16px rgba(0, 0, 0, 0.6),
-    0 8px 24px -8px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 16px 48px -12px rgba(0, 0, 0, 0.45),
+    0 8px 24px -8px var(--accent-soft),
     0 1px 0 0 rgba(255, 255, 255, 0.08) inset;
+
+  transition:
+    background 200ms var(--ease-out),
+    border-color 200ms var(--ease-out),
+    box-shadow 200ms var(--ease-out);
+
+  /* Staggered entry */
+  animation: aubos-capsule-in 480ms var(--ease-out) 220ms both;
 }
+
+.aubos-onb-input-bar:focus-within {
+  background: var(--surface-1);
+  border-color: rgba(220, 220, 224, 0.50);
+  box-shadow:
+    0 16px 48px -12px rgba(0, 0, 0, 0.55),
+    0 0 0 3px rgba(220, 220, 224, 0.14),
+    0 1px 0 0 rgba(255, 255, 255, 0.10) inset;
+}
+
+@keyframes aubos-capsule-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Textarea — Geist, no chrome (capsule provides the chrome). */
 .aubos-onb-input-bar textarea {
   flex: 1;
+  align-self: center;
   background: transparent;
   border: 0;
-  color: #fff;
+  color: var(--fg-strong);
   resize: none;
   font-family: var(--font-sans);
-  font-size: 0.95rem;
+  font-size: 16px;          /* 16px per taste-skill (17px reads cliché) */
   font-weight: 400;
-  letter-spacing: -0.005em;
+  letter-spacing: -0.01em;
   line-height: 1.5;
-  padding: 10px 14px;
+  padding: 14px 0;
   outline: none;
   min-height: 28px;
-  max-height: 96px;
+  max-height: 144px;
+  caret-color: var(--accent);
 }
 .aubos-onb-input-bar textarea::placeholder {
-  color: rgba(255, 255, 255, 0.40);
+  color: var(--fg-muted);
   font-weight: 400;
 }
 .aubos-onb-input-bar textarea:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
+  cursor: not-allowed;
 }
-/* Send (icon) + Send-to-team (pill) buttons. Together with the mic
-   button, the three actions read as one composed control inside the
-   blurred input pill. */
-.aubos-onb-send-btn {
-  flex-shrink: 0;
-  width: 36px; height: 36px;
-  display: inline-flex; align-items: center; justify-content: center;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.85);
-  border-radius: 10px;
-  cursor: pointer;
-  transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.08s;
-}
-.aubos-onb-send-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.30);
-  color: #fff;
-}
-.aubos-onb-send-btn:active:not(:disabled) { transform: scale(0.96); }
-.aubos-onb-send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-/* "Send to AUBOS" — the heroic, named action. Wider pill with blue
-   accent so it visually separates from the icon buttons and reads as
-   the eventual goal of the conversation. */
-.aubos-onb-send-team-btn {
+/* ━━━ Action buttons ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Per micro-interactions + emil-design-eng:
+     • All buttons 40px, circular (mic + send + team-send all match)
+     • Hover scale 1.04, active scale 0.96 — tactile feedback
+     • Press transition 80ms, hover transition 160ms
+     • Easing: cubic-bezier(0.23, 1, 0.32, 1) — strong ease-out, no CSS default
+     • Visible focus ring (2px accent + 2px offset) — a11y required
+     • Single desaturated accent — no gradients, no rainbow
+     • Tinted shadow (accent hue) — never default black
+     • Staggered entry: 350ms after capsule */
+.aubos-onb-input-bar > button {
   flex-shrink: 0;
+  animation: aubos-btn-in 320ms var(--ease-out) 360ms both;
+}
+.aubos-onb-input-bar > button:nth-of-type(2) { animation-delay: 400ms; }
+.aubos-onb-input-bar > button:nth-of-type(3) { animation-delay: 440ms; }
+
+@keyframes aubos-btn-in {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* Common button base (mic + send share this; team-send extends it) */
+.aubos-onb-mic-btn,
+.aubos-onb-send-btn {
+  position: relative;
+  width: 40px; height: 40px;
   display: inline-flex; align-items: center; justify-content: center;
-  height: 36px;
-  padding: 0 14px;
-  background: rgba(96, 165, 250, 0.18);
-  border: 1px solid rgba(96, 165, 250, 0.45);
-  color: #bfdbfe;
-  border-radius: 10px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.66rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  border-radius: 50%;
   cursor: pointer;
-  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  transition:
+    background 160ms var(--ease-out),
+    color 160ms var(--ease-out),
+    border-color 160ms var(--ease-out),
+    transform 80ms var(--ease-press),
+    box-shadow 160ms var(--ease-out);
 }
-.aubos-onb-send-team-btn:hover:not(:disabled) {
-  background: rgba(96, 165, 250, 0.3);
-  border-color: rgba(96, 165, 250, 0.75);
-  color: #fff;
+.aubos-onb-mic-btn:focus-visible,
+.aubos-onb-send-btn:focus-visible,
+.aubos-onb-send-team-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
-.aubos-onb-send-team-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.aubos-onb-mic-btn:disabled,
+.aubos-onb-send-btn:disabled,
+.aubos-onb-send-team-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Send button — solid accent (not gradient). Goes from ghost (disabled =
+   no text) to solid accent (ready). Hover lifts +1.04, press dips to 0.96. */
+.aubos-onb-send-btn {
+  background: var(--surface-2);
+  border: 1px solid var(--border-mid);
+  color: var(--fg-muted);
+}
+.aubos-onb-send-btn:not(:disabled) {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--accent-fg);
+  box-shadow: 0 4px 12px -2px var(--accent-soft);
+}
+.aubos-onb-send-btn:not(:disabled):hover {
+  transform: scale(1.04);
+  box-shadow: 0 6px 18px -2px rgba(220, 220, 224, 0.35);
+}
+.aubos-onb-send-btn:not(:disabled):active { transform: scale(0.96); }
+
+/* Team-send — secondary surface (NOT accent). Differentiated from send
+   button by the icon + label, not by competing for color attention. */
+.aubos-onb-send-team-btn {
+  height: 40px;
+  padding: 0 16px;
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-mid);
+  color: var(--fg-strong);
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  transition:
+    background 160ms var(--ease-out),
+    border-color 160ms var(--ease-out),
+    color 160ms var(--ease-out),
+    transform 80ms var(--ease-press);
+}
+.aubos-onb-send-team-btn:not(:disabled):hover {
+  background: var(--surface-hi);
+  border-color: var(--border-strong);
+}
+.aubos-onb-send-team-btn:not(:disabled):active { transform: scale(0.97); }
 
 /* Canvas drawer */
 .aubos-onb-drawer {
@@ -1457,52 +1723,38 @@ body {
 
 /* ─── S3: voice loop UI ──────────────────────────────────────────────── */
 
+/* Mic button — restrained idle (ghost circle), single decisive active
+   state (solid red + ONE ripple ring, not three). Per impeccable: the
+   active state needs ONE clear visual signal, not a maximalist stack. */
 .aubos-onb-mic-btn {
-  position: relative;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  color: rgba(255, 255, 255, 0.78);
-  border-radius: 10px;
-  width: 40px;
-  height: 40px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background 0.14s, border-color 0.14s, color 0.14s, transform 0.08s;
-  flex-shrink: 0;
+  background: var(--surface-2);
+  border: 1px solid var(--border-mid);
+  color: var(--fg);
 }
 
 .aubos-onb-mic-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.10);
-  color: #fff;
-  border-color: rgba(255, 255, 255, 0.28);
+  background: var(--surface-hi);
+  color: var(--fg-strong);
+  border-color: var(--border-strong);
+  transform: scale(1.04);
 }
-.aubos-onb-mic-btn:active:not(:disabled) { transform: scale(0.94); }
+.aubos-onb-mic-btn:active:not(:disabled) { transform: scale(0.96); }
 
-/* LIVE state — three concurrent signals so it's impossible to miss:
-   1. Solid red fill (vs ghosted ring when idle) — high-contrast color shift
-   2. Pulsing inner glow (1s heartbeat — physiological, reads as "alive")
-   3. Three expanding ripple rings (the "broadcast" signal — clearly active)
-   The button itself becomes a focal point of the screen. */
+/* Active recording state — single signal: solid red + ONE softly
+   expanding ring. No heartbeat shadow, no triple ripples. */
 .aubos-onb-mic-btn.active {
-  background: rgba(239, 68, 68, 0.92);
-  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(239, 68, 68, 0.95);
+  border-color: rgba(239, 68, 68, 0.95);
   color: #ffffff;
-  animation: aubos-mic-heartbeat 1s ease-in-out infinite;
 }
-.aubos-onb-mic-btn.active::before,
 .aubos-onb-mic-btn.active::after {
   content: "";
   position: absolute;
   inset: -2px;
-  border-radius: 12px;
-  border: 2px solid rgba(239, 68, 68, 0.7);
+  border-radius: 50%;
+  border: 1.5px solid rgba(239, 68, 68, 0.6);
   pointer-events: none;
-  animation: aubos-mic-ripple 1.6s ease-out infinite;
-}
-.aubos-onb-mic-btn.active::after {
-  animation-delay: 0.8s;
+  animation: aubos-mic-ripple 1.8s var(--ease-out) infinite;
 }
 
 @keyframes aubos-mic-heartbeat {
@@ -1625,8 +1877,8 @@ body {
   text-wrap: pretty;
 }
 .aubos-onb-chatfeed-msg.from-user .aubos-onb-chatfeed-msg-body {
-  background: rgba(96, 165, 250, 0.18);
-  border: 1px solid rgba(96, 165, 250, 0.28);
+  background: rgba(220, 220, 224, 0.14);
+  border: 1px solid rgba(220, 220, 224, 0.28);
   color: rgba(255, 255, 255, 0.96);
   border-bottom-right-radius: 4px;
 }

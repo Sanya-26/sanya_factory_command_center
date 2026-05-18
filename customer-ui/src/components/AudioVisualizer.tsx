@@ -102,21 +102,20 @@ export function AudioVisualizer({ lipsync, isSpeaking, className }: Props): JSX.
         smoothed[i] += (frame[i] - smoothed[i]) * lerp;
       }
 
-      // ── Outer glow halo (drawn behind everything) ────────────────────
+      // ── Outer glow halo — chrome bloom (drawn behind everything) ──────
       const avgEnergy = smoothed.reduce((s, v) => s + v, 0) / NUM_BARS;
       const haloR = baseRadius + maxBar * (0.4 + avgEnergy * 0.6);
       const g1 = ctx.createRadialGradient(cx, cy, baseRadius * 0.3, cx, cy, haloR * 1.8);
-      g1.addColorStop(0,    `rgba(139, 92, 246, ${0.30 + avgEnergy * 0.25})`);
-      g1.addColorStop(0.5,  `rgba(96, 165, 250, ${0.15 + avgEnergy * 0.20})`);
-      g1.addColorStop(1,    "rgba(96, 165, 250, 0)");
+      g1.addColorStop(0,    `rgba(240, 240, 245, ${0.30 + avgEnergy * 0.25})`);
+      g1.addColorStop(0.5,  `rgba(200, 200, 208, ${0.14 + avgEnergy * 0.18})`);
+      g1.addColorStop(1,    "rgba(160, 160, 168, 0)");
       ctx.fillStyle = g1;
       ctx.beginPath();
       ctx.arc(cx, cy, haloR * 1.8, 0, Math.PI * 2);
       ctx.fill();
 
-      // ── Radial bars ───────────────────────────────────────────────────
-      // Each bar is a rounded rect emerging from baseRadius, length ∝ energy.
-      // Color shifts from cool blue (low freq, bass) to warm purple (high freq, treble).
+      // ── Radial bars — pure silver/chrome, no hue. Lightness varies
+      //    with bar index (subtle radial brightness gradient) + energy. ───
       for (let i = 0; i < NUM_BARS; i++) {
         const angle = (i / NUM_BARS) * Math.PI * 2 - Math.PI / 2;
         const energy = smoothed[i];
@@ -128,25 +127,26 @@ export function AudioVisualizer({ lipsync, isSpeaking, className }: Props): JSX.
         const x2 = cx + Math.cos(angle) * r2;
         const y2 = cy + Math.sin(angle) * r2;
 
-        const hue = 220 + (i / NUM_BARS) * 60;  // 220° (blue) → 280° (purple)
-        const sat = 70 + energy * 30;
-        const light = 55 + energy * 15;
+        // Silver palette: lightness sweeps 68% → 92% around the ring so
+        // the orb feels like brushed metal catching light from one side.
+        const light = 70 + Math.sin((i / NUM_BARS) * Math.PI * 2) * 12 + energy * 10;
+        const alpha = 0.45 + energy * 0.5;
 
         ctx.lineCap = "round";
         ctx.lineWidth = 3;
-        ctx.strokeStyle = `hsla(${hue}, ${sat}%, ${light}%, ${0.5 + energy * 0.5})`;
+        ctx.strokeStyle = `hsla(220, 4%, ${light}%, ${alpha})`;
         ctx.beginPath();
         ctx.moveTo(x1, y1);
         ctx.lineTo(x2, y2);
         ctx.stroke();
       }
 
-      // ── Inner core orb ───────────────────────────────────────────────
+      // ── Inner core orb — polished chrome (white → silver fade) ───────
       const coreR = baseRadius * (0.85 + avgEnergy * 0.25);
       const g2 = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR);
       g2.addColorStop(0,   `rgba(255, 255, 255, ${0.95})`);
-      g2.addColorStop(0.4, `rgba(196, 181, 253, ${0.7 + avgEnergy * 0.2})`);
-      g2.addColorStop(1,   `rgba(96, 165, 250, 0.0)`);
+      g2.addColorStop(0.4, `rgba(225, 225, 230, ${0.65 + avgEnergy * 0.2})`);
+      g2.addColorStop(1,   `rgba(160, 160, 168, 0.0)`);
       ctx.fillStyle = g2;
       ctx.beginPath();
       ctx.arc(cx, cy, coreR, 0, Math.PI * 2);
