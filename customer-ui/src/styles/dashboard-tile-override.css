@@ -1,0 +1,11 @@
+/* Dashboard Tile — layout rules only.
+   The previous `background`/`backdrop-filter`/`box-shadow` !important rules
+   forced all tiles dark purple with zero effects, which defeated the global
+   crystal/liquid-glass system. Keep layout (min-height, radius, relative)
+   and let `.bg-card` or `.bob-surface` provide the surface look. */
+
+.dashboard-tile {
+  position: relative;
+  min-height: 50px;
+  border-radius: 16px;
+}

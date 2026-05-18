@@ -1,0 +1,64 @@
+/* Dashboard Font Override - Cormorant for all text */
+/* Strictly enforces Cormorant typography across the main dashboard */
+
+/* Base dashboard font */
+.dashboard-garamond,
+.dashboard-garamond * {
+  font-family: 'Cormorant', Georgia, 'Times New Roman', serif !important;
+}
+
+/* Headings */
+.dashboard-garamond h1,
+.dashboard-garamond h2,
+.dashboard-garamond h3,
+.dashboard-garamond h4,
+.dashboard-garamond h5,
+.dashboard-garamond h6 {
+  font-family: 'Cormorant', Georgia, 'Times New Roman', serif !important;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* Body text */
+.dashboard-garamond p,
+.dashboard-garamond span,
+.dashboard-garamond div,
+.dashboard-garamond label,
+.dashboard-garamond button {
+  font-family: 'Cormorant', Georgia, 'Times New Roman', serif !important;
+}
+
+/* Metric values - larger and bolder */
+.dashboard-garamond .metric-value {
+  font-family: 'Cormorant', Georgia, 'Times New Roman', serif !important;
+  font-weight: 500;
+  font-feature-settings: 'lnum' 1, 'tnum' 1;
+}
+
+/* Small labels */
+.dashboard-garamond .metric-label {
+  font-family: 'Cormorant', Georgia, 'Times New Roman', serif !important;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Chart labels and tooltips */
+.dashboard-garamond .recharts-text,
+.dashboard-garamond .recharts-cartesian-axis-tick-value,
+.dashboard-garamond .recharts-tooltip-wrapper {
+  font-family: 'Cormorant', Georgia, 'Times New Roman', serif !important;
+}
+
+/* Input fields */
+.dashboard-garamond input,
+.dashboard-garamond textarea {
+  font-family: 'Cormorant', Georgia, 'Times New Roman', serif !important;
+}
+
+/* Pills and badges */
+.dashboard-garamond .pill,
+.dashboard-garamond .badge {
+  font-family: 'Cormorant', Georgia, 'Times New Roman', serif !important;
+  font-weight: 500;
+}

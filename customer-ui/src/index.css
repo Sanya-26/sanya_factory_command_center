@@ -1,0 +1,2064 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: #050505;
+  color: #ededed;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Mono "blueprint" canvas node ──────────────────────────────────── */
+.aubos-onb-mono-node {
+  position: relative;
+  min-width: 200px;
+  padding: 14px 16px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.10) inset,
+    0 6px 20px -10px rgba(0, 0, 0, 0.5);
+}
+.aubos-onb-mono-node .kind-tag {
+  font-size: 0.50rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
+}
+.aubos-onb-mono-node .label { font-size: 0.78rem; color: #ededed; line-height: 1.35; }
+.aubos-onb-mono-node .sub-label { font-size: 0.62rem; color: rgba(255,255,255,0.55); margin-top: 2px; }
+.aubos-onb-mono-handle {
+  width: 6px !important; height: 6px !important;
+  background: rgba(255,255,255,0.55) !important;
+  border: none !important;
+}
+.react-flow__edge-text { fill: rgba(255,255,255,0.65) !important; font-family: ui-monospace, monospace !important; font-size: 10px !important; }
+.react-flow__edge-textbg { fill: rgba(0,0,0,0.5) !important; }
+
+/* ─── Automation badges on canvas nodes (proposal mode) ──────────────── */
+.aubos-onb-mono-node.is-ai {
+  border-color: rgba(74, 222, 128, 0.55) !important;
+  box-shadow: 0 0 0 0.5px rgba(74, 222, 128, 0.25) inset, 0 0 14px rgba(74, 222, 128, 0.12) !important;
+}
+.aubos-onb-mono-node.is-user {
+  border-color: rgba(251, 191, 36, 0.6) !important;
+  box-shadow: 0 0 0 0.5px rgba(251, 191, 36, 0.25) inset, 0 0 14px rgba(251, 191, 36, 0.1) !important;
+}
+.aubos-onb-mono-node .auto-badge {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-family: ui-monospace, monospace;
+  font-size: 0.55rem;
+  letter-spacing: 0.1em;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 8px;
+  text-transform: uppercase;
+}
+.aubos-onb-mono-node .auto-badge.auto-ai {
+  background: rgba(74, 222, 128, 0.18);
+  color: rgba(74, 222, 128, 1);
+  border: 1px solid rgba(74, 222, 128, 0.4);
+}
+.aubos-onb-mono-node .auto-badge.auto-user {
+  background: rgba(251, 191, 36, 0.15);
+  color: rgba(251, 191, 36, 1);
+  border: 1px solid rgba(251, 191, 36, 0.4);
+}
+
+/* ─── Proposal banner ────────────────────────────────────────────────── */
+.aubos-onb-proposal-banner {
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 14px 8px 18px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.aubos-onb-proposal-stats {
+  display: flex;
+  gap: 14px;
+  font-size: 0.66rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+.aubos-onb-proposal-stats span strong {
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: 600;
+  margin-right: 4px;
+}
+.aubos-onb-proposal-accept {
+  background: rgba(74, 222, 128, 0.95);
+  color: #042513;
+  border: 0;
+  padding: 7px 14px;
+  border-radius: 6px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  font-size: 0.72rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.aubos-onb-proposal-accept:hover { background: rgba(120, 235, 165, 1); }
+.aubos-onb-proposal-accept:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ─── Integration login rail (left edge, proposal mode) ──────────────── */
+.aubos-onb-int-rail {
+  position: absolute;
+  top: 110px;
+  left: 16px;
+  z-index: 6;
+  width: 260px;
+  background: rgba(10, 10, 10, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+}
+.aubos-onb-int-rail header {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 12px;
+}
+.aubos-onb-int-rail header strong {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.9);
+}
+.aubos-onb-int-rail header small {
+  font-size: 0.62rem;
+  color: rgba(255, 255, 255, 0.45);
+  margin-top: 4px;
+}
+.aubos-onb-int-rail ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.aubos-onb-int-tile {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.7rem;
+}
+.aubos-onb-int-tile:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.04);
+}
+.aubos-onb-int-tile.connected {
+  border-color: rgba(74, 222, 128, 0.5);
+  background: rgba(74, 222, 128, 0.08);
+}
+.aubos-onb-int-tile .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
+}
+.aubos-onb-int-tile.connected .dot { background: rgba(74, 222, 128, 1); }
+.aubos-onb-int-tile .name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.aubos-onb-int-tile .status {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.5);
+}
+.aubos-onb-int-tile.connected .status { color: rgba(74, 222, 128, 1); }
+
+/* ─── Node detail drawer (right edge, opens on click in proposal mode) ─ */
+.aubos-onb-node-detail {
+  position: absolute;
+  top: 110px;
+  right: 16px;
+  z-index: 6;
+  width: 320px;
+  background: rgba(10, 10, 10, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  max-height: calc(100vh - 200px);
+  display: flex;
+  flex-direction: column;
+}
+.aubos-onb-node-detail header {
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.aubos-onb-node-detail header strong {
+  display: block;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: 500;
+}
+.aubos-onb-node-detail header small {
+  display: block;
+  font-size: 0.6rem;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.aubos-onb-node-detail header button {
+  background: transparent;
+  border: 0;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+.aubos-onb-node-detail-body {
+  padding: 14px;
+  overflow-y: auto;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.85);
+}
+.aubos-onb-node-detail-body .field {
+  margin-bottom: 14px;
+}
+.aubos-onb-node-detail-body .field label {
+  display: block;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.58rem;
+  margin-bottom: 6px;
+}
+.aubos-onb-node-detail-body .field p {
+  margin: 0;
+  line-height: 1.55;
+}
+.aubos-onb-node-detail-body .field ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.aubos-onb-node-detail-body .field ul li {
+  padding: 3px 0;
+  color: rgba(255, 255, 255, 0.75);
+}
+.aubos-onb-node-detail-body .auto-badge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 6px;
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+}
+.aubos-onb-node-detail-body .auto-badge.auto-ai {
+  background: rgba(74, 222, 128, 0.18);
+  color: rgba(74, 222, 128, 1);
+  border: 1px solid rgba(74, 222, 128, 0.4);
+}
+.aubos-onb-node-detail-body .auto-badge.auto-user {
+  background: rgba(251, 191, 36, 0.15);
+  color: rgba(251, 191, 36, 1);
+  border: 1px solid rgba(251, 191, 36, 0.4);
+}
+
+/* ─── Connect-integration modal ──────────────────────────────────────── */
+.aubos-onb-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.aubos-onb-modal {
+  width: 100%;
+  max-width: 420px;
+  background: #0a0a0a;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+}
+.aubos-onb-modal header {
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.aubos-onb-modal header strong {
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+}
+.aubos-onb-modal header button {
+  background: transparent;
+  border: 0;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 1.3rem;
+  cursor: pointer;
+  line-height: 1;
+}
+.aubos-onb-modal-body {
+  padding: 18px;
+}
+.aubos-onb-modal-body p {
+  font-size: 0.7rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.65);
+  margin: 0 0 12px;
+}
+.aubos-onb-modal-body input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: rgba(255, 255, 255, 0.95);
+  font-family: inherit;
+  font-size: 0.78rem;
+}
+.aubos-onb-modal-body input:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.45);
+}
+.aubos-onb-modal-error {
+  color: rgba(248, 113, 113, 0.95);
+  background: rgba(248, 113, 113, 0.08);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  padding: 8px 10px;
+  border-radius: 5px;
+  margin-top: 10px;
+  font-size: 0.66rem;
+}
+.aubos-onb-modal-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  justify-content: flex-end;
+}
+.aubos-onb-modal-cancel {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.7);
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+.aubos-onb-modal-cancel:hover { color: rgba(255, 255, 255, 0.95); border-color: rgba(255, 255, 255, 0.3); }
+.aubos-onb-modal-save {
+  background: rgba(255, 255, 255, 0.95);
+  color: #000;
+  border: 0;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-family: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.aubos-onb-modal-save:disabled { opacity: 0.5; cursor: not-allowed; }
+.aubos-onb-modal-save:hover:not(:disabled) { background: rgba(255, 255, 255, 1); }
+
+/* ─── Onboarding stage — "classy futuristic" backdrop ───────────────────
+   Layered CSS-only background. Reads as an Apple-keynote stage:
+   midnight-navy base, soft aurora halo behind Cleo's head, gentle side
+   gradients for depth, faint scan-line at the horizon, ultra-subtle grid
+   for tech texture, and a downstage uplight glow. Pure gradients — no
+   images, no third-party assets. All layers stay under ~3% opacity so
+   Cleo remains the focal point and the page never feels busy. */
+.aubos-onb-stage {
+  position: fixed;
+  inset: 0;
+  background:
+    /* Aurora halo behind Cleo's head — stronger purple bloom centered
+       just behind where her head sits in frame (upper-third). The
+       camera is at eye-line so the head is at ~30% from top. */
+    radial-gradient(ellipse 50% 40% at 50% 28%, rgba(139, 92, 246, 0.35), transparent 75%),
+    radial-gradient(ellipse 30% 25% at 50% 28%, rgba(196, 181, 253, 0.20), transparent 70%),
+    /* Side depth — cool blue on left, warm violet on right */
+    radial-gradient(ellipse 50% 100% at 0% 50%, rgba(59, 130, 246, 0.12), transparent 60%),
+    radial-gradient(ellipse 50% 100% at 100% 50%, rgba(168, 85, 247, 0.10), transparent 60%),
+    /* Downstage uplight — soft cyan, sells the "she's standing on a stage" feel */
+    radial-gradient(ellipse 80% 30% at 50% 100%, rgba(56, 189, 248, 0.14), transparent 70%),
+    /* Horizon scan-line — 1px bright line at exactly mid-height; the eye
+       reads this as a stage edge / horizon, anchoring depth */
+    linear-gradient(to bottom, transparent 49.5%, rgba(255, 255, 255, 0.04) 50%, transparent 50.5%),
+    /* Ultra-faint grid — 80px squares of cool-blue lines at 2.5% opacity.
+       Adds "futuristic tech surface" texture without competing for attention */
+    linear-gradient(to right,  rgba(96, 165, 250, 0.025) 1px, transparent 1px) 0 0 / 80px 80px,
+    linear-gradient(to bottom, rgba(96, 165, 250, 0.025) 1px, transparent 1px) 0 0 / 80px 80px,
+    /* Deep midnight base — radial darkens toward edges for vignette feel */
+    radial-gradient(ellipse at center, #0a0e1a 0%, #050608 90%);
+  color: #ededed;
+  overflow: hidden;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Floating motes — slow-drifting particles for atmosphere. Multiple radial
+   gradients at random positions, slowly animated. Adds life without being
+   distracting. Uses transform (not background-position) so the GPU
+   composites it cheaply. */
+.aubos-onb-stage::before {
+  content: "";
+  position: absolute;
+  inset: -20px;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    radial-gradient(1px 1px at 12% 22%, rgba(255, 255, 255, 0.55), transparent 100%),
+    radial-gradient(1.5px 1.5px at 87% 15%, rgba(139, 92, 246, 0.65), transparent 100%),
+    radial-gradient(1px 1px at 72% 68%, rgba(56, 189, 248, 0.55), transparent 100%),
+    radial-gradient(2px 2px at 28% 78%, rgba(255, 255, 255, 0.35), transparent 100%),
+    radial-gradient(1px 1px at 94% 82%, rgba(168, 85, 247, 0.5), transparent 100%),
+    radial-gradient(1.5px 1.5px at 6% 58%, rgba(96, 165, 250, 0.45), transparent 100%),
+    radial-gradient(1px 1px at 48% 10%, rgba(255, 255, 255, 0.4), transparent 100%),
+    radial-gradient(1px 1px at 38% 45%, rgba(196, 181, 253, 0.5), transparent 100%),
+    radial-gradient(1.5px 1.5px at 65% 35%, rgba(255, 255, 255, 0.3), transparent 100%);
+  animation: aubos-stage-drift 90s ease-in-out infinite alternate;
+}
+
+@keyframes aubos-stage-drift {
+  from { transform: translate3d(-6px, -8px, 0); }
+  to   { transform: translate3d( 8px, 10px, 0); }
+}
+
+/* top status bar */
+.aubos-onb-stage-top {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 18px 24px;
+  z-index: 10;
+}
+.aubos-onb-stage-top .aubos-onb-brand strong {
+  font-size: 0.74rem; letter-spacing: 0.18em; text-transform: uppercase;
+}
+.aubos-onb-stage-top .aubos-onb-brand small {
+  color: rgba(255,255,255,0.5); font-size: 0.62rem; margin-left: 4px;
+}
+.aubos-onb-stage-customer {
+  display: flex; gap: 14px; align-items: center;
+  font-size: 0.7rem; color: rgba(255, 255, 255, 0.65);
+}
+.aubos-onb-canvas-toggle {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.75);
+  font-family: inherit; font-size: 0.6rem;
+  padding: 6px 12px; border-radius: 4px;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  cursor: pointer; transition: all 0.15s;
+}
+.aubos-onb-canvas-toggle:hover {
+  background: rgba(255, 255, 255, 0.10);
+  border-color: rgba(255, 255, 255, 0.30);
+  color: #fff;
+}
+
+/* the 3D canvas takes the whole screen below the top bar */
+.aubos-onb-avatar-stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  cursor: pointer; /* tap-to-unlock the audio context */
+}
+.aubos-onb-avatar-canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Caption under Cleo */
+.aubos-onb-caption {
+  position: absolute;
+  bottom: 110px;
+  left: 50%; transform: translateX(-50%);
+  max-width: 720px; width: calc(100% - 64px);
+  padding: 12px 18px;
+  text-align: center;
+  z-index: 5;
+  pointer-events: none;
+  transition: opacity 0.4s, transform 0.4s;
+}
+.aubos-onb-caption span {
+  display: inline-block;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 10px 18px;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.92);
+  line-height: 1.45;
+}
+.aubos-onb-caption .hint {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.72rem;
+  font-style: italic;
+}
+.aubos-onb-caption.speaking span {
+  border-color: rgba(96, 165, 250, 0.5);
+  box-shadow: 0 0 24px rgba(96, 165, 250, 0.18);
+}
+
+/* Bottom input bar */
+.aubos-onb-input-bar {
+  position: absolute;
+  bottom: 24px;
+  left: 50%; transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: calc(100% - 48px);
+  max-width: 720px;
+  z-index: 6;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 8px;
+}
+.aubos-onb-input-bar textarea {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  color: #fff;
+  resize: none;
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 8px 12px;
+  outline: none;
+  min-height: 24px;
+  max-height: 80px;
+}
+.aubos-onb-input-bar textarea::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+.aubos-onb-input-bar textarea:disabled {
+  opacity: 0.5;
+}
+/* Send (icon) + Send-to-team (pill) buttons. Together with the mic
+   button, the three actions read as one composed control inside the
+   blurred input pill. */
+.aubos-onb-send-btn {
+  flex-shrink: 0;
+  width: 36px; height: 36px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.85);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.08s;
+}
+.aubos-onb-send-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.30);
+  color: #fff;
+}
+.aubos-onb-send-btn:active:not(:disabled) { transform: scale(0.96); }
+.aubos-onb-send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* "Send to AUBOS" — the heroic, named action. Wider pill with blue
+   accent so it visually separates from the icon buttons and reads as
+   the eventual goal of the conversation. */
+.aubos-onb-send-team-btn {
+  flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 36px;
+  padding: 0 14px;
+  background: rgba(96, 165, 250, 0.18);
+  border: 1px solid rgba(96, 165, 250, 0.45);
+  color: #bfdbfe;
+  border-radius: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.aubos-onb-send-team-btn:hover:not(:disabled) {
+  background: rgba(96, 165, 250, 0.3);
+  border-color: rgba(96, 165, 250, 0.75);
+  color: #fff;
+}
+.aubos-onb-send-team-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* Canvas drawer */
+.aubos-onb-drawer {
+  position: absolute;
+  top: 0; right: 0;
+  width: min(640px, 80vw);
+  height: 100%;
+  background: rgba(10, 10, 12, 0.96);
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  transform: translateX(100%);
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  z-index: 20;
+  display: flex; flex-direction: column;
+}
+.aubos-onb-drawer.open {
+  transform: translateX(0);
+}
+.aubos-onb-drawer-head {
+  display: flex; align-items: baseline; gap: 12px;
+  padding: 18px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.aubos-onb-drawer-head strong { font-size: 0.78rem; }
+.aubos-onb-drawer-head small {
+  color: rgba(255, 255, 255, 0.5); font-size: 0.62rem;
+  letter-spacing: 0.06em;
+}
+.aubos-onb-drawer-close {
+  margin-left: auto;
+  width: 28px; height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1.2rem;
+  line-height: 1;
+}
+.aubos-onb-drawer-body {
+  flex: 1;
+  position: relative;
+}
+.aubos-onb-drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 15;
+}
+
+/* ─────────────────── Phase 3R · Settings page ───────────────────── */
+
+.aubos-settings {
+  max-width: 920px;
+  margin: 40px auto;
+  padding: 0 24px 60px;
+  color: rgba(255, 255, 255, 0.92);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+}
+.aubos-settings-header {
+  display: flex; align-items: baseline; gap: 16px;
+  margin-bottom: 28px;
+}
+.aubos-settings-header h1 {
+  font-size: 1.6rem; font-weight: 600; letter-spacing: -0.02em;
+}
+.aubos-settings-header .company-label {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.aubos-settings-loading,
+.aubos-settings-error {
+  padding: 80px 24px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.6);
+}
+.aubos-settings-tabs {
+  display: flex; gap: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 28px;
+}
+.aubos-tab {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.aubos-tab.is-active {
+  color: rgba(255, 255, 255, 0.95);
+  border-bottom-color: rgba(110, 240, 200, 0.8);
+}
+.aubos-settings-body section { display: block; }
+.aubos-settings-body h2 {
+  font-size: 1.1rem; font-weight: 600; letter-spacing: -0.01em;
+  margin-bottom: 6px;
+}
+.aubos-byok-intro,
+.aubos-integrations-intro,
+.aubos-automation-intro {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.85rem;
+  margin-bottom: 20px;
+  max-width: 640px;
+}
+.aubos-byok-refresh {
+  display: inline-flex; gap: 6px; align-items: center;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 8px;
+}
+
+/* BYOK rows */
+.aubos-byok-list { list-style: none; padding: 0; margin: 0; }
+.aubos-byok-row {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 16px 18px;
+  margin-bottom: 12px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+.aubos-byok-meta { display: flex; flex-direction: column; gap: 2px; }
+.aubos-byok-name { font-size: 0.95rem; }
+.aubos-byok-help { font-size: 0.7rem; color: rgba(255, 255, 255, 0.45); }
+.aubos-byok-status { font-size: 0.72rem; margin-top: 4px; }
+.aubos-byok-status.ok { color: rgba(110, 240, 200, 0.9); }
+.aubos-byok-status.off { color: rgba(255, 255, 255, 0.4); }
+.aubos-byok-form { display: flex; gap: 8px; align-items: center; }
+.aubos-byok-form input[type="password"] {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  padding: 8px 10px;
+  color: rgba(255, 255, 255, 0.95);
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.78rem;
+}
+.aubos-byok-form button,
+.aubos-integrations button,
+.aubos-kill-switch button {
+  background: rgba(110, 240, 200, 0.15);
+  color: rgba(110, 240, 200, 0.95);
+  border: 1px solid rgba(110, 240, 200, 0.35);
+  border-radius: 4px;
+  padding: 7px 14px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.aubos-byok-form button:disabled { opacity: 0.5; cursor: not-allowed; }
+.aubos-byok-form button.danger {
+  background: rgba(240, 110, 110, 0.12);
+  color: rgba(240, 110, 110, 0.9);
+  border-color: rgba(240, 110, 110, 0.35);
+}
+.aubos-byok-result {
+  font-size: 0.72rem;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.aubos-byok-result.ok { color: rgba(110, 240, 200, 0.9); }
+.aubos-byok-result.err { color: rgba(240, 110, 110, 0.9); }
+
+/* Integrations */
+.aubos-integrations-list {
+  list-style: none; padding: 0; margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+}
+.aubos-integration {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 14px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.aubos-integration.connected { border-color: rgba(110, 240, 200, 0.35); }
+.aubos-integration-name { font-size: 0.85rem; }
+.aubos-integration-state .ok { color: rgba(110, 240, 200, 0.9); font-size: 0.72rem; }
+
+/* Automation */
+.aubos-kill-switch {
+  display: flex; align-items: center; gap: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 14px 18px;
+  margin-bottom: 24px;
+}
+.aubos-kill-switch.is-on {
+  border-color: rgba(240, 110, 110, 0.5);
+  background: rgba(240, 110, 110, 0.06);
+}
+.aubos-kill-text { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.aubos-kill-text strong { font-size: 0.92rem; }
+.aubos-kill-text span { font-size: 0.72rem; color: rgba(255, 255, 255, 0.55); }
+.aubos-cap-list { list-style: none; padding: 0; margin: 0; }
+.aubos-cap-empty {
+  padding: 30px; text-align: center;
+  color: rgba(255, 255, 255, 0.5); font-size: 0.85rem;
+  border: 1px dashed rgba(255, 255, 255, 0.1); border-radius: 6px;
+}
+.aubos-cap-row {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 14px 18px;
+  margin-bottom: 10px;
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 16px;
+  align-items: center;
+}
+.aubos-cap-name { font-size: 0.92rem; }
+.aubos-cap-auto { display: flex; flex-direction: column; gap: 4px; font-size: 0.78rem; }
+.aubos-cap-auto label { display: flex; align-items: center; gap: 6px; }
+.aubos-cap-caps { display: flex; flex-direction: column; gap: 6px; font-size: 0.72rem; }
+.aubos-cap-caps label { display: flex; align-items: center; gap: 6px; color: rgba(255, 255, 255, 0.55); }
+.aubos-cap-caps input {
+  width: 60px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  padding: 3px 6px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.78rem;
+}
+.spin { animation: aubos-spin 1s linear infinite; }
+@keyframes aubos-spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+
+/* ─── Phase 3U · Ads scope chooser modal ─── */
+.aubos-modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 50;
+}
+.aubos-modal {
+  background: rgba(20, 20, 24, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 24px 26px;
+  max-width: 460px;
+  width: calc(100% - 40px);
+  color: rgba(255, 255, 255, 0.94);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+}
+.aubos-modal h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.aubos-modal-intro {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.55);
+  margin-bottom: 16px;
+}
+.aubos-scope-list {
+  list-style: none; padding: 0; margin: 0 0 16px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.aubos-scope-list li {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.aubos-scope-list label {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 8px 10px;
+  cursor: pointer;
+}
+.aubos-scope-list strong { font-size: 0.88rem; grid-column: 2; }
+.aubos-scope-list span { font-size: 0.72rem; color: rgba(255, 255, 255, 0.55); grid-column: 2; }
+.aubos-scope-list input[type="radio"] { grid-row: span 2; align-self: center; }
+.aubos-modal-actions {
+  display: flex; gap: 8px; justify-content: flex-end;
+}
+.aubos-modal-actions button {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  padding: 7px 14px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.9);
+}
+.aubos-modal-actions button.primary {
+  background: rgba(110, 240, 200, 0.15);
+  color: rgba(110, 240, 200, 0.95);
+  border-color: rgba(110, 240, 200, 0.35);
+}
+
+/* ─── Phase 4 · CleoDock (persistent companion on every page) ─── */
+
+.cleo-dock-bubble {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  background: rgba(110, 240, 200, 0.18);
+  border: 1px solid rgba(110, 240, 200, 0.4);
+  color: rgba(110, 240, 200, 1);
+  cursor: pointer;
+  z-index: 80;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.18s ease;
+}
+.cleo-dock-bubble:hover { transform: scale(1.08); }
+
+.cleo-dock {
+  position: fixed;
+  top: 0; right: 0; bottom: 0;
+  width: 380px;
+  background: rgba(15, 15, 20, 0.97);
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex; flex-direction: column;
+  z-index: 80;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  color: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(20px);
+}
+.cleo-dock.is-minimized {
+  height: 56px; bottom: auto;
+}
+.cleo-dock-head {
+  display: flex; align-items: center; gap: 16px;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.cleo-dock-head strong { font-size: 0.95rem; }
+.cleo-dock-tabs { flex: 1; display: flex; gap: 4px; }
+.cleo-dock-tabs button {
+  background: transparent; border: 1px solid transparent; color: rgba(255, 255, 255, 0.6);
+  padding: 4px 10px; border-radius: 4px; font-size: 0.78rem; cursor: pointer;
+}
+.cleo-dock-tabs button.active {
+  border-color: rgba(110, 240, 200, 0.35);
+  color: rgba(110, 240, 200, 0.95);
+}
+.cleo-dock-tabs .badge {
+  background: rgba(110, 240, 200, 0.25); padding: 1px 5px; border-radius: 3px;
+  margin-left: 4px; font-size: 0.66rem;
+}
+.cleo-dock-actions { display: flex; gap: 4px; }
+.cleo-dock-actions button {
+  background: transparent; border: none; color: rgba(255, 255, 255, 0.55);
+  cursor: pointer; padding: 4px; border-radius: 3px;
+}
+.cleo-dock-actions button:hover { background: rgba(255, 255, 255, 0.06); }
+
+.cleo-dock-body, .cleo-dock-canvas {
+  flex: 1; overflow-y: auto; padding: 16px;
+}
+.cleo-dock-empty {
+  color: rgba(255, 255, 255, 0.5); font-size: 0.82rem; padding: 24px 0;
+  line-height: 1.5;
+}
+.cleo-msg { margin-bottom: 14px; }
+.cleo-msg .role {
+  display: inline-block; font-size: 0.66rem; color: rgba(255, 255, 255, 0.4);
+  letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 4px;
+}
+.cleo-msg .text {
+  font-size: 0.86rem; line-height: 1.55;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.cleo-msg.cleo .text { background: rgba(110, 240, 200, 0.08); }
+
+.cleo-dock-input {
+  display: flex; gap: 8px; padding: 12px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.cleo-dock-input textarea {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 8px 10px;
+  color: rgba(255, 255, 255, 0.95);
+  font-family: inherit; font-size: 0.82rem;
+  resize: none; max-height: 96px;
+}
+.cleo-dock-input button {
+  background: rgba(110, 240, 200, 0.18); border: 1px solid rgba(110, 240, 200, 0.4);
+  color: rgba(110, 240, 200, 0.95); border-radius: 4px; padding: 0 12px;
+  cursor: pointer;
+}
+.cleo-dock-input button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.cleo-canvas-list { list-style: none; padding: 0; margin: 0; }
+.cleo-canvas-item {
+  display: flex; flex-direction: column; gap: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px; padding: 10px 12px; margin-bottom: 8px;
+  cursor: pointer; transition: border-color 0.15s ease;
+}
+.cleo-canvas-item:hover { border-color: rgba(110, 240, 200, 0.35); }
+.cleo-canvas-item .kind-tag {
+  font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+}
+.cleo-canvas-item .title { font-size: 0.85rem; }
+.cleo-canvas-item small { font-size: 0.66rem; color: rgba(255, 255, 255, 0.45); }
+/* ─── S2.5: AI subscriptions gate ─────────────────────────────────────── */
+
+.ai-subs-gate {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: linear-gradient(180deg, #050505 0%, #0c0c0e 100%);
+  color: rgba(255, 255, 255, 0.92);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.ai-subs-gate-loading {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.5);
+  background: #050505;
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+}
+
+.ai-subs-gate-card {
+  width: 100%;
+  max-width: 620px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 36px 36px 28px;
+}
+
+.ai-subs-gate-card h1 {
+  margin: 0 0 8px;
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.ai-subs-gate-intro {
+  margin: 0 0 24px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.ai-subs-gate-banner {
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 18px;
+}
+
+.ai-subs-gate-banner.warning {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #fcd34d;
+}
+
+.ai-subs-gate-banner.error {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+}
+
+.ai-subs-gate-providers {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.ai-subs-card {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 16px 18px;
+  background: rgba(255, 255, 255, 0.015);
+  transition: border-color 200ms;
+}
+
+.ai-subs-card.ai-subs-card-connected {
+  border-color: rgba(34, 197, 94, 0.4);
+  background: rgba(34, 197, 94, 0.04);
+}
+
+.ai-subs-card.ai-subs-card-expired,
+.ai-subs-card.ai-subs-card-revoked {
+  border-color: rgba(245, 158, 11, 0.4);
+  background: rgba(245, 158, 11, 0.04);
+}
+
+.ai-subs-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.ai-subs-card-status {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-family: ui-monospace, monospace;
+}
+
+.ai-subs-card-status-connected {
+  background: rgba(34, 197, 94, 0.15);
+  color: #86efac;
+}
+
+.ai-subs-card-status-expired,
+.ai-subs-card-status-revoked {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fcd34d;
+}
+
+.ai-subs-card-status-pending-capture {
+  background: rgba(148, 163, 184, 0.1);
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.ai-subs-card-sub {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.ai-subs-card-btn {
+  background: #fff;
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 120ms, background 120ms;
+}
+
+.ai-subs-card-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.ai-subs-card-btn.connected,
+.ai-subs-card-btn:disabled {
+  background: rgba(34, 197, 94, 0.15);
+  color: #86efac;
+  cursor: default;
+}
+
+.ai-subs-gate-footer {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.35);
+  line-height: 1.5;
+}
+
+.ai-subs-gate-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.ai-subs-gate-modal {
+  background: #0c0c0e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 28px;
+  max-width: 440px;
+  width: calc(100% - 32px);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.ai-subs-gate-modal h2 {
+  margin: 0 0 12px;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.ai-subs-gate-modal p {
+  margin: 8px 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.ai-subs-gate-modal-link {
+  display: inline-block;
+  margin-bottom: 6px;
+  color: #60a5fa;
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+.ai-subs-gate-modal-code {
+  font-family: ui-monospace, monospace;
+  font-size: 28px;
+  letter-spacing: 0.2em;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 14px;
+  margin: 12px 0;
+}
+
+.ai-subs-gate-modal-foot {
+  font-size: 12px !important;
+  color: rgba(255, 255, 255, 0.4) !important;
+  text-align: center;
+}
+
+.ai-subs-gate-modal-cancel {
+  width: 100%;
+  margin-top: 12px;
+  padding: 8px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.anthropic-oauth-callback {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #050505;
+  color: rgba(255, 255, 255, 0.92);
+  padding: 24px;
+}
+
+.anthropic-oauth-callback-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 28px 32px;
+  max-width: 440px;
+  text-align: center;
+}
+
+.anthropic-oauth-callback-card.ok { border-color: rgba(34, 197, 94, 0.4); }
+.anthropic-oauth-callback-card.error { border-color: rgba(239, 68, 68, 0.4); }
+
+.anthropic-oauth-callback-title {
+  font-size: 18px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.anthropic-oauth-callback-msg {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.anthropic-oauth-callback-close {
+  margin-top: 16px;
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* ─── S3: voice loop UI ──────────────────────────────────────────────── */
+
+.aubos-onb-mic-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.7);
+  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms, color 120ms;
+  margin-right: 6px;
+}
+
+.aubos-onb-mic-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.aubos-onb-mic-btn.active {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #fca5a5;
+  animation: aubos-mic-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes aubos-mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.45); }
+  50%      { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+}
+
+.aubos-onb-mic-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.aubos-onb-caption.transcript {
+  font-style: italic;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* MicPermissionGate overlay */
+.mic-permission-gate {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 24px;
+}
+
+.mic-permission-gate-card {
+  background: #0c0c0e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 28px 32px;
+  max-width: 460px;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.mic-permission-gate-card h2 {
+  margin: 0 0 10px;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.mic-permission-gate-body {
+  margin: 0 0 18px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.mic-permission-gate-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mic-permission-gate-btn {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 120ms, background 120ms;
+}
+
+.mic-permission-gate-btn.primary {
+  background: #fff;
+  color: #000;
+  border: none;
+}
+
+.mic-permission-gate-btn.primary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.mic-permission-gate-btn.secondary {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.mic-permission-gate-btn.secondary:hover {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.mic-permission-gate-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ─── S4: DocumentDropzone ────────────────────────────────────────────── */
+
+.doc-dropzone {
+  position: absolute;
+  bottom: 80px;
+  left: 24px;
+  z-index: 7;
+  max-width: 320px;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  transition: border-color 120ms, background 120ms;
+}
+
+.doc-dropzone.drag-over {
+  background: rgba(59, 130, 246, 0.18);
+  border-color: rgba(59, 130, 246, 0.6);
+}
+
+.doc-dropzone-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-align: left;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+
+.doc-dropzone-btn:hover { color: rgba(255, 255, 255, 0.95); }
+
+.doc-dropzone-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.doc-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  border-radius: 6px;
+}
+
+.doc-row.status-extracted { color: #86efac; }
+.doc-row.status-extraction-failed,
+.doc-row.status-unsupported-format,
+.doc-row.status-error { color: #fcd34d; }
+
+.doc-row-icon { flex-shrink: 0; }
+
+.doc-row-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.doc-row-status {
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  color: rgba(255, 255, 255, 0.5);
+  flex-shrink: 0;
+}
+
+/* ─── S5: scene polish — office background slot + camera framing ──────── */
+
+/* Parent div hosts the optional office background. Asset slot:
+   cleo-avatars/cleo-office-bg-v1.gif (Storage). VITE_CLEO_OFFICE_BG_URL
+   may override. Default is `none` so the parent `.aubos-onb-stage`
+   "classy futuristic" backdrop shows through. If you ever want to put a
+   GIF/image directly behind Cleo (e.g. brand-specific scene), set the
+   --cleo-office-bg CSS var or VITE_CLEO_OFFICE_BG_URL. */
+.aubos-onb-avatar-stage {
+  background-image: var(--cleo-office-bg, none);
+  background-size: cover;
+  background-position: center;
+}
+
+/* Edge vignette — two layers:
+   1. Horizontal hard fade: kills the T-posed arms that extend off the
+      sides (no idle animation loaded; arms ship in T-pose).
+   2. Soft corner vignette: adds atmospheric depth without dimming the
+      face. The aurora glow + midnight backdrop do most of the work;
+      this just frames everything. */
+.aubos-onb-avatar-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    /* Horizontal sides — kill the T-pose arms */
+    linear-gradient(to right,
+      rgba(5, 6, 10, 0.95) 0%,
+      rgba(5, 6, 10, 0.45) 8%,
+      transparent 14%,
+      transparent 86%,
+      rgba(5, 6, 10, 0.45) 92%,
+      rgba(5, 6, 10, 0.95) 100%
+    ),
+    /* Corner falloff for ambience */
+    radial-gradient(ellipse 110% 95% at 50% 50%, transparent 65%, rgba(5, 6, 10, 0.45) 95%, rgba(5, 6, 10, 0.7) 100%);
+  z-index: 2;
+}
+
+/* Camera framing — half-body, slightly wider for the "full person" idle
+   pose. The actual <Canvas> camera setup is in Cleo3D; this just nudges
+   the visible canvas viewport (overflow + padding so the avatar's lower
+   edge has breathing room). */
+.aubos-onb-avatar-canvas {
+  padding-bottom: 6vh;
+}
+
+/* Gio client operating system */
+.gio-os {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 188px minmax(0, 1fr);
+  background: #f7f7f4;
+  color: #111111;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.gio-os * {
+  box-sizing: border-box;
+  color: inherit;
+  letter-spacing: 0;
+}
+
+.gio-os button {
+  font: inherit;
+}
+
+.gio-os-rail {
+  min-height: 100vh;
+  padding: 18px 12px;
+  border-right: 1px solid #deded8;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.gio-os-mark {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border: 1px solid #111111;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.gio-os-rail nav {
+  display: grid;
+  gap: 6px;
+}
+
+.gio-os-rail button,
+.gio-os-actions button,
+.gio-os-button-row button,
+.gio-os-tools button {
+  min-height: 38px;
+  border: 1px solid #d7d7d0;
+  background: #ffffff;
+  color: #161616;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease, transform 150ms ease;
+}
+
+.gio-os-rail button {
+  text-align: left;
+  padding: 0 10px;
+  font-size: 0.82rem;
+}
+
+.gio-os-rail button:hover,
+.gio-os-actions button:hover,
+.gio-os-button-row button:hover,
+.gio-os-tools button:hover,
+.gio-os-tool-list button:hover,
+.gio-os-canvas-node:hover {
+  background: #efefe9;
+  border-color: #111111;
+}
+
+.gio-os-main {
+  min-width: 0;
+  padding: 22px;
+  display: grid;
+  gap: 18px;
+}
+
+.gio-os-topbar,
+.gio-os-panel-head,
+.gio-os-detail,
+.gio-os-bottom {
+  display: flex;
+  gap: 14px;
+}
+
+.gio-os-topbar {
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.gio-os-topbar p,
+.gio-os-panel-head p {
+  margin: 0 0 5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  color: #77776f;
+}
+
+.gio-os h1,
+.gio-os h2 {
+  margin: 0;
+  color: #111111;
+  font-weight: 600;
+}
+
+.gio-os h1 {
+  font-size: clamp(1.9rem, 3vw, 3rem);
+  line-height: 1;
+}
+
+.gio-os h2 {
+  font-size: 1rem;
+}
+
+.gio-os-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.gio-os-actions button,
+.gio-os-button-row button,
+.gio-os-tools button {
+  padding: 0 13px;
+  font-size: 0.78rem;
+}
+
+.gio-os-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.gio-os-stack article,
+.gio-os-panel {
+  border: 1px solid #deded8;
+  background: #ffffff;
+}
+
+.gio-os-stack article {
+  min-height: 104px;
+  padding: 14px;
+  display: grid;
+  align-content: space-between;
+}
+
+.gio-os-stack span,
+.gio-os-stack small,
+.gio-os-tool-list span,
+.gio-os-tool-list small,
+.gio-os-canvas-node span,
+.gio-os-contract dt,
+.gio-os-table th,
+.gio-os-log p {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.68rem;
+  color: #77776f;
+}
+
+.gio-os-stack strong {
+  color: #111111;
+  font-size: 0.9rem;
+  word-break: break-word;
+}
+
+.gio-os-board {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.92fr) minmax(0, 1.35fr);
+  gap: 18px;
+}
+
+.gio-os-panel {
+  padding: 16px;
+}
+
+.gio-os-canvas-panel {
+  min-height: 360px;
+  padding: 16px;
+  border: 1px solid #deded8;
+  background: #ffffff;
+}
+
+.gio-os-panel-head {
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.gio-os-panel-head > span {
+  border: 1px solid #d7d7d0;
+  padding: 5px 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  color: #55554f;
+}
+
+.gio-os-map ol {
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  counter-reset: map;
+}
+
+.gio-os-map li {
+  counter-increment: map;
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 10px;
+  align-items: start;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.gio-os-map li::before {
+  content: counter(map, decimal-leading-zero);
+  color: #77776f;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.68rem;
+}
+
+.gio-os-canvas {
+  position: relative;
+  min-height: 292px;
+  margin-top: 16px;
+  overflow: hidden;
+  border: 1px solid #d7d7d0;
+  background:
+    linear-gradient(#efefe9 1px, transparent 1px),
+    linear-gradient(90deg, #efefe9 1px, transparent 1px),
+    #fbfbf8;
+  background-size: 28px 28px;
+}
+
+.gio-os-canvas-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.gio-os-canvas-lines line {
+  stroke: #b9b9b0;
+  stroke-width: 0.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.gio-os-canvas-node {
+  position: absolute;
+  width: 156px;
+  min-height: 70px;
+  padding: 10px;
+  translate: -50% 0;
+  border: 1px solid #d7d7d0;
+  background: #ffffff;
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.gio-os-canvas-node[data-kind="goal"] {
+  border-color: #111111;
+}
+
+.gio-os-canvas-node[data-kind="tool"] {
+  background: #f3f3ee;
+}
+
+.gio-os-canvas-node[data-kind="data"] {
+  border-style: dashed;
+}
+
+.gio-os-canvas-node strong {
+  font-size: 0.82rem;
+  line-height: 1.25;
+}
+
+.gio-os-tool-list {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.gio-os-tool-list button {
+  min-height: 126px;
+  padding: 13px;
+  border: 1px solid #deded8;
+  background: #fbfbf8;
+  text-align: left;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  cursor: pointer;
+}
+
+.gio-os-tool-list button[aria-pressed="true"] {
+  border-color: #111111;
+  background: #ffffff;
+  box-shadow: inset 0 0 0 1px #111111;
+}
+
+.gio-os-tool-list strong {
+  font-size: 0.9rem;
+  color: #111111;
+}
+
+.gio-os-tool-list span {
+  font-family: inherit;
+  font-size: 0.78rem;
+  line-height: 1.42;
+}
+
+.gio-os-tool-list button[data-state="paused"] small {
+  color: #9a4b11;
+}
+
+.gio-os-tool-list button[data-state="needs-setup"] small {
+  color: #9f1239;
+}
+
+.gio-os-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+}
+
+.gio-os-copy {
+  margin: 14px 0 0;
+  max-width: 70ch;
+  color: #4f4f48;
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.gio-os-contract {
+  margin: 16px 0 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid #deded8;
+}
+
+.gio-os-contract div {
+  min-height: 88px;
+  padding: 12px;
+  border-right: 1px solid #deded8;
+}
+
+.gio-os-contract div:last-child {
+  border-right: 0;
+}
+
+.gio-os-contract dt,
+.gio-os-contract dd {
+  margin: 0;
+}
+
+.gio-os-contract dd {
+  margin-top: 8px;
+  color: #1f1f1d;
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.gio-os-button-row {
+  margin-top: 16px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.gio-os-tools {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.gio-os-tools button {
+  min-height: 46px;
+  text-align: left;
+}
+
+.gio-os-bottom {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
+}
+
+.gio-os-table {
+  width: 100%;
+  margin-top: 14px;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.gio-os-table th,
+.gio-os-table td {
+  padding: 11px 8px;
+  border-bottom: 1px solid #e5e5de;
+  text-align: left;
+}
+
+.gio-os-table td {
+  color: #33332f;
+}
+
+.gio-os-log {
+  margin-top: 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.gio-os-log p {
+  margin: 0;
+  padding: 9px 10px;
+  border: 1px solid #eeeeea;
+  background: #fbfbf8;
+  line-height: 1.35;
+}
+
+@media (max-width: 980px) {
+  .gio-os {
+    grid-template-columns: 1fr;
+  }
+
+  .gio-os-rail {
+    min-height: auto;
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid #deded8;
+  }
+
+  .gio-os-rail nav {
+    display: flex;
+  }
+
+  .gio-os-grid,
+  .gio-os-board,
+  .gio-os-detail,
+  .gio-os-bottom {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .gio-os-main {
+    padding: 14px;
+  }
+
+  .gio-os-topbar {
+    flex-direction: column;
+  }
+
+  .gio-os-tool-list,
+  .gio-os-tools,
+  .gio-os-contract {
+    grid-template-columns: 1fr;
+  }
+
+  .gio-os-canvas {
+    min-height: 520px;
+  }
+
+  .gio-os-canvas-node {
+    width: 138px;
+  }
+
+  .gio-os-contract div,
+  .gio-os-contract div:last-child {
+    border-right: 0;
+    border-bottom: 1px solid #deded8;
+  }
+}

@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+*.tsbuildinfo
+.vite/
+.DS_Store
+*.log
+.claude/
+src-tauri/target/

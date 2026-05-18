@@ -1,0 +1,474 @@
+/* ============================================
+   CLEAN WHITE DASHBOARD THEME
+   Subtle shadows, light borders, refined
+   ============================================ */
+
+/* ── Clean Card ── */
+.agent-glass-card {
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 14px;
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.08), inset 0 4px 20px rgba(255, 255, 255, 0.3);
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.agent-glass-card:hover {
+  border-color: rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
+}
+
+/* ── Premium Widget Card ── */
+.premium-widget {
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 14px;
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.08), inset 0 4px 20px rgba(255, 255, 255, 0.3);
+  padding: 20px 24px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  will-change: transform, box-shadow;
+}
+
+.premium-widget:hover {
+  border-color: rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px) translateZ(0);
+}
+
+/* Gradient accent bar at top of widget */
+.premium-widget::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #0ea5e9, #06b6d4);
+  opacity: 0.8;
+}
+
+.premium-widget--violet::before {
+  background: linear-gradient(90deg, #8b5cf6, #a78bfa);
+}
+
+.premium-widget--success::before {
+  background: linear-gradient(90deg, #10b981, #14b8a6);
+}
+
+.premium-widget--danger::before {
+  background: linear-gradient(90deg, #ef4444, #f97316);
+}
+
+/* ── Chart Title Typography ── */
+.chart-title {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+/* ── KPI Metric Card ── */
+.kpi-card {
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 14px;
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.08), inset 0 4px 20px rgba(255, 255, 255, 0.3);
+  padding: 16px 20px;
+  transition: all 0.3s ease;
+  will-change: transform;
+}
+
+.kpi-card:hover {
+  border-color: rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.kpi-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #0ea5e9, #06b6d4);
+  opacity: 0.8;
+}
+
+.kpi-card--violet::before {
+  background: linear-gradient(90deg, #8b5cf6, #a78bfa);
+}
+
+.kpi-card--success::before {
+  background: linear-gradient(90deg, #10b981, #14b8a6);
+}
+
+.kpi-card--danger::before {
+  background: linear-gradient(90deg, #ef4444, #f97316);
+}
+
+/* KPI value — no glow on white */
+.kpi-value {
+  font-feature-settings: "tnum";
+  color: #111827;
+}
+
+.kpi-value--violet {
+  color: #8b5cf6;
+}
+
+.kpi-value--success {
+  color: #111827;
+}
+
+.kpi-value--danger {
+  color: #ef4444;
+}
+
+/* Trend badge */
+.trend-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+.trend-badge--up {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+}
+
+.trend-badge--down {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+}
+
+/* Shimmer animation on data refresh */
+@keyframes kpiShimmer {
+  0% { opacity: 1; }
+  50% { opacity: 0.7; }
+  100% { opacity: 1; }
+}
+
+.kpi-shimmer {
+  animation: kpiShimmer 1.5s ease-in-out;
+}
+
+/* ── Section Labels ── */
+.agent-section-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+/* ── Metric Value ── */
+.agent-metric-value {
+  font-weight: 300;
+  color: #111827;
+  font-feature-settings: "tnum";
+  letter-spacing: 0.02em;
+}
+
+/* ── Headings ── */
+.agent-heading {
+  font-weight: 300;
+  letter-spacing: 0.04em;
+  background: linear-gradient(135deg, #0ea5e9, #06b6d4);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Body Text ── */
+.agent-body-text {
+  font-weight: 300;
+  color: #6b7280;
+  letter-spacing: 0.02em;
+}
+
+/* ── Accent Utilities ── */
+.agent-accent-text { color: #0ea5e9; }
+.agent-accent-bg { background: linear-gradient(135deg, #0ea5e9, #06b6d4); }
+.agent-accent-border { border-color: rgba(14, 165, 233, 0.2); }
+.agent-accent-glow { box-shadow: 0 0 12px rgba(14, 165, 233, 0.1); }
+
+/* ── Chart Container ── */
+.agent-chart-container {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 14px;
+  padding: 20px;
+}
+
+/* ── Tab Styling ── */
+.agent-tab {
+  font-size: 11px;
+  font-weight: 400;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  color: rgba(0, 0, 0, 0.45);
+  background: transparent;
+  transition: all 0.3s ease;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.agent-tab:hover {
+  color: #111827;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.agent-tab[data-state="active"] {
+  color: #0ea5e9;
+  background: rgba(14, 165, 233, 0.08);
+  border: 1px solid rgba(14, 165, 233, 0.2);
+}
+
+/* ── Button Primary ── */
+.agent-btn-primary {
+  font-weight: 400;
+  font-size: 11px;
+  padding: 0.5rem 1.25rem;
+  border-radius: 8px;
+  background: rgba(14, 165, 233, 0.08);
+  color: #0ea5e9;
+  border: 1px solid rgba(14, 165, 233, 0.2);
+  transition: all 0.3s ease;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.agent-btn-primary:hover {
+  background: rgba(14, 165, 233, 0.12);
+  border-color: rgba(14, 165, 233, 0.3);
+  box-shadow: 0 0 12px rgba(14, 165, 233, 0.1);
+}
+
+/* ── Button Secondary ── */
+.agent-btn-secondary {
+  font-weight: 400;
+  font-size: 11px;
+  padding: 0.5rem 1.25rem;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.02);
+  color: #6b7280;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.agent-btn-secondary:hover {
+  border-color: rgba(0, 0, 0, 0.15);
+  color: #111827;
+}
+
+/* ── Divider ── */
+.agent-divider {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(14, 165, 233, 0.15) 50%,
+    transparent 100%
+  );
+}
+
+/* ── Tab List Override ── */
+.agent-dashboard .tabs-list,
+.agent-dashboard [role="tablist"] {
+  background: #10b981;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 10px;
+  padding: 4px;
+}
+
+/* ── Card Override ── */
+.agent-dashboard .y2k-card {
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.agent-dashboard .y2k-card:hover {
+  border-color: rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* ── Status Indicators ── */
+.agent-status-active {
+  background: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.3);
+}
+
+.agent-status-warning {
+  background: #f59e0b;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.3);
+}
+
+.agent-status-error {
+  background: #ef4444;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.3);
+}
+
+/* ── Recharts Global Overrides ── */
+.agent-dashboard .recharts-cartesian-axis-tick-value {
+  font-size: 10px;
+  fill: rgba(0, 0, 0, 0.4);
+  font-weight: 400;
+}
+
+.agent-dashboard .recharts-legend-item-text {
+  font-size: 10px;
+  fill: rgba(0, 0, 0, 0.45);
+  font-weight: 400;
+}
+
+.agent-dashboard .recharts-tooltip-wrapper {
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.1));
+}
+
+/* Recharts dot hover glow */
+.recharts-dot:hover,
+.recharts-active-dot circle {
+  filter: drop-shadow(0 0 6px currentColor);
+}
+
+/* ── Bar chart load animation ── */
+@keyframes barGrow {
+  from {
+    transform: scaleY(0);
+    transform-origin: bottom;
+  }
+  to {
+    transform: scaleY(1);
+    transform-origin: bottom;
+  }
+}
+
+.animate-bar-grow .recharts-bar-rectangle {
+  animation: barGrow 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* ── Line draw-in animation ── */
+@keyframes lineDrawIn {
+  from { stroke-dashoffset: 2000; }
+  to { stroke-dashoffset: 0; }
+}
+
+.animate-line-draw .recharts-line-curve {
+  stroke-dasharray: 2000;
+  animation: lineDrawIn 1.5s ease-out forwards;
+}
+
+/* ── Area fade-in animation ── */
+@keyframes areaFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-area-fade .recharts-area-area {
+  animation: areaFadeIn 1s ease-out forwards;
+}
+
+/* ── Sparkline background for KPI cards ── */
+.kpi-sparkline-bg {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60%;
+  opacity: 0.06;
+  pointer-events: none;
+}
+
+/* ── Premium Legend (dots instead of squares) ── */
+.premium-legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding-top: 8px;
+}
+
+.premium-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.premium-legend-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Alert Dialog ── */
+.agent-dashboard .alert-dialog-content {
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 14px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+/* ── GPU acceleration hints ── */
+.gpu-accelerated {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+}
+
+/* ── Hover crosshair cursor for charts ── */
+.chart-crosshair .recharts-tooltip-cursor {
+  stroke: rgba(14, 165, 233, 0.3) !important;
+  stroke-width: 1 !important;
+  stroke-dasharray: 4 4 !important;
+}
+
+/* ── Holographic shimmer for cards ── */
+@keyframes holoShimmer {
+  0%, 100% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  40% { opacity: 0; }
+  50% { opacity: 1; }
+  60% { opacity: 0; }
+  100% {
+    transform: translateX(200%);
+    opacity: 0;
+  }
+}
+
+/* ── Floating depth parallax ── */
+@keyframes subtleFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+.subtle-float {
+  animation: subtleFloat 6s ease-in-out infinite;
+}
