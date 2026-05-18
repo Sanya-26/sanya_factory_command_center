@@ -71,7 +71,7 @@ function MonoNode({ data }: NodeProps): JSX.Element {
 }
 const NODE_TYPES = { mono: MonoNode };
 import { supabase } from "@/integrations/supabase";
-import { Loader2, Send, Package2, Sparkles, Mic, MicOff } from "lucide-react";
+import { Loader2, Send, Package2, Sparkles, Play, Pause } from "lucide-react";
 import { useMicCapture } from "@/lib/useMicCapture";
 import { useCleoSTT } from "@/lib/useCleoSTT";
 import { MicPermissionGate } from "@/components/MicPermissionGate";
@@ -158,6 +158,15 @@ export default function CleoOnboarding(): JSX.Element {
   // WS is open + useMicCapture is recording. Final transcripts flow into the
   // chat input + auto-submit.
   const [micEnabled, setMicEnabled] = useState<boolean>(false);
+  // Voice mode — persistent play/pause for the whole voice loop.
+  // "playing" = mic listening + Cleo's TTS auto-plays her replies
+  // "paused"  = mic off + TTS muted + any in-flight playback stops
+  // Default "paused" so first page-load doesn't grab the microphone
+  // without an explicit user gesture (browser autoplay + privacy).
+  const [voiceMode, setVoiceMode] = useState<"playing" | "paused">(() => {
+    if (typeof window === "undefined") return "paused";
+    return (localStorage.getItem("cleo:voice-mode") as "playing" | "paused") ?? "paused";
+  });
   const voiceTurnRef = useRef<VoiceTurn | null>(null);
   const [canvas, setCanvas] = useState<CanvasState | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -188,13 +197,16 @@ export default function CleoOnboarding(): JSX.Element {
     new URL(window.location.href).searchParams.get("dev") === "1";
 
   // Cleo's voice + lipsync — drives the 3D avatar's mouth via wawa-lipsync.
-  const { lipsync, isSpeaking, speak, unlock: unlockTTS } = useTalkingCleo();
+  const { lipsync, isSpeaking, speak, stop: stopSpeaking, unlock: unlockTTS } = useTalkingCleo();
   // Track the last assistant message id we've already spoken so realtime
   // backfills don't replay the entire history every time.
   const spokenRef = useRef<Set<string>>(new Set());
 
-  // Whenever a new assistant message lands, speak it through the avatar.
+  // Whenever a new assistant message lands, speak it through the avatar
+  // — but only when voice mode is "playing". In "paused" mode, replies
+  // arrive silently as text bubbles; nothing is spoken.
   useEffect(() => {
+    if (voiceMode !== "playing") return;
     const last = [...messages].reverse().find((m) => m.role === "assistant");
     if (!last) return;
     if (spokenRef.current.has(last.id)) return;
@@ -205,7 +217,7 @@ export default function CleoOnboarding(): JSX.Element {
     // effect when speak changes would re-speak the last message. We only
     // want to fire when a NEW message arrives.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages]);
+  }, [messages, voiceMode]);
 
   // Last assistant message — shown as a soft caption under Cleo while she
   // speaks. MUST live above the early-return guards so hook order is stable.
@@ -473,6 +485,39 @@ export default function CleoOnboarding(): JSX.Element {
     await mic.start();
     setMicEnabled(true);
   }, [companyId, micEnabled, mic, stt]);
+
+  // Voice mode toggle — single control for the whole voice loop.
+  // Play  → mic on + Cleo speaks future replies
+  // Pause → mic off + interrupt any in-flight TTS + future replies stay silent
+  const toggleVoiceMode = useCallback(async () => {
+    if (!companyId) return;
+    if (voiceMode === "playing") {
+      // Pause: stop everything
+      stopSpeaking();
+      if (micEnabled) {
+        mic.stop();
+        stt.close();
+        setMicEnabled(false);
+        voiceTurnRef.current = null;
+      }
+      setVoiceMode("paused");
+      localStorage.setItem("cleo:voice-mode", "paused");
+    } else {
+      // Play: start mic + TTS auto-fires on next assistant reply
+      try {
+        await unlockTTS(); // browser autoplay gesture-unlock
+      } catch {/* non-fatal */}
+      if (!micEnabled) {
+        voiceTurnRef.current = startVoiceTurn(companyId);
+        voiceTurnRef.current.log("mic-start");
+        await stt.connect();
+        await mic.start();
+        setMicEnabled(true);
+      }
+      setVoiceMode("playing");
+      localStorage.setItem("cleo:voice-mode", "playing");
+    }
+  }, [companyId, voiceMode, micEnabled, mic, stt, stopSpeaking, unlockTTS]);
 
   // Auto-stop the mic if speaking starts somehow without permission resolved.
   useEffect(() => {
@@ -866,15 +911,23 @@ export default function CleoOnboarding(): JSX.Element {
             disabled={sending || sentToAubos}
             rows={1}
           />
+          {/* Persistent voice-mode toggle — controls the whole voice loop:
+              Play  = mic listening + Cleo's replies are spoken
+              Pause = mic muted + replies arrive silently as text
+              The icon shows the action the tap will perform (Play when paused,
+              Pause when playing) — matches universal media-player convention.
+              Pulsing silver halo when active so the customer can see she's live. */}
           <button
             type="button"
-            onClick={() => void toggleMic()}
+            onClick={() => void toggleVoiceMode()}
             disabled={sending || sentToAubos}
-            className={`aubos-onb-mic-btn ${micEnabled ? "active" : ""}`}
-            aria-label={micEnabled ? "Stop listening" : "Talk to Cleo"}
-            title={micEnabled ? "Stop listening" : "Talk to Cleo"}
+            className={`aubos-onb-voice-btn ${voiceMode === "playing" ? "playing" : ""}`}
+            aria-label={voiceMode === "playing" ? "Pause voice mode" : "Start voice mode"}
+            title={voiceMode === "playing" ? "Pause — mute Cleo + stop mic" : "Play — Cleo speaks + mic listens"}
           >
-            {micEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
+            {voiceMode === "playing"
+              ? <Pause className="h-[16px] w-[16px]" fill="currentColor" />
+              : <Play className="h-[16px] w-[16px]" fill="currentColor" />}
           </button>
           <button
             type="button"

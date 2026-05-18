@@ -614,7 +614,7 @@ body {
 
 .aubos-onb-orb-wrap {
   flex-shrink: 0;
-  height: clamp(180px, 28vh, 280px);
+  height: clamp(240px, 36vh, 360px);
   position: relative;
 }
 .aubos-onb-orb-canvas {
@@ -960,7 +960,8 @@ body {
 
 /* Common button base (mic + send share this; team-send extends it) */
 .aubos-onb-mic-btn,
-.aubos-onb-send-btn {
+.aubos-onb-send-btn,
+.aubos-onb-voice-btn {
   position: relative;
   width: 40px; height: 40px;
   display: inline-flex; align-items: center; justify-content: center;
@@ -975,15 +976,67 @@ body {
 }
 .aubos-onb-mic-btn:focus-visible,
 .aubos-onb-send-btn:focus-visible,
+.aubos-onb-voice-btn:focus-visible,
 .aubos-onb-send-team-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 .aubos-onb-mic-btn:disabled,
 .aubos-onb-send-btn:disabled,
+.aubos-onb-voice-btn:disabled,
 .aubos-onb-send-team-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+/* Voice-mode toggle — persistent play/pause for the whole voice loop.
+   PAUSED: bright silver outline ring with the play icon (visible, "tap to start
+           voice"). Bumped from ghost to clearly affordant since the previous
+           version blended into the input bar.
+   PLAYING: solid silver chrome fill with the pause icon + pulsing halo
+            (active, "tap to stop"). */
+.aubos-onb-voice-btn {
+  background: rgba(225, 227, 232, 0.10);
+  border: 1.5px solid rgba(225, 227, 232, 0.45);
+  color: rgba(240, 240, 245, 0.95);
+  box-shadow:
+    0 2px 8px -2px rgba(220, 220, 224, 0.20),
+    0 0 0 0 rgba(220, 220, 224, 0.25);
+}
+.aubos-onb-voice-btn:hover:not(:disabled) {
+  background: rgba(225, 227, 232, 0.18);
+  border-color: rgba(225, 227, 232, 0.70);
+  color: #ffffff;
+  transform: scale(1.04);
+  box-shadow:
+    0 4px 12px -2px rgba(220, 220, 224, 0.30),
+    0 0 0 3px rgba(220, 220, 224, 0.10);
+}
+.aubos-onb-voice-btn:active:not(:disabled) { transform: scale(0.94); }
+
+.aubos-onb-voice-btn.playing {
+  background: rgba(225, 227, 232, 0.92);
+  color: #0a0a0a;
+  border-color: rgba(255, 255, 255, 0.30);
+  animation: aubos-voice-pulse 1.6s ease-in-out infinite;
+  box-shadow: 0 4px 14px -2px rgba(220, 220, 224, 0.30);
+}
+.aubos-onb-voice-btn.playing:hover {
+  background: rgba(255, 255, 255, 1);
+  transform: scale(1.04);
+}
+
+@keyframes aubos-voice-pulse {
+  0%, 100% {
+    box-shadow:
+      0 4px 14px -2px rgba(220, 220, 224, 0.30),
+      0 0 0 0 rgba(220, 220, 224, 0.30);
+  }
+  50% {
+    box-shadow:
+      0 4px 14px -2px rgba(220, 220, 224, 0.30),
+      0 0 0 8px rgba(220, 220, 224, 0.0);
+  }
 }
 
 /* Send button — solid accent (not gradient). Goes from ghost (disabled =
@@ -1004,6 +1057,52 @@ body {
   box-shadow: 0 6px 18px -2px rgba(220, 220, 224, 0.35);
 }
 .aubos-onb-send-btn:not(:disabled):active { transform: scale(0.96); }
+
+/* Stop button — replaces send while Cleo is speaking. Reads as an
+   "interrupt" affordance: round, monochrome silver with a pulsing
+   ring so the customer knows tapping it cuts her off. */
+.aubos-onb-stop-btn {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(225, 227, 232, 0.92);
+  color: #0a0a0a;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  cursor: pointer;
+  font-family: inherit;
+  position: relative;
+  transition:
+    transform 140ms var(--ease-out),
+    background-color 200ms var(--ease-out),
+    box-shadow 200ms var(--ease-out);
+  animation: aubos-stop-pulse 1.6s ease-in-out infinite;
+  box-shadow: 0 4px 14px -2px rgba(220, 220, 224, 0.30);
+}
+.aubos-onb-stop-btn:hover {
+  background: rgba(255, 255, 255, 1);
+  transform: scale(1.04);
+}
+.aubos-onb-stop-btn:active { transform: scale(0.94); }
+.aubos-onb-stop-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Soft halo pulse — signals "active state, tap to interrupt" without
+   being aggressive. Lives behind the button via box-shadow ring. */
+@keyframes aubos-stop-pulse {
+  0%, 100% {
+    box-shadow:
+      0 4px 14px -2px rgba(220, 220, 224, 0.30),
+      0 0 0 0 rgba(220, 220, 224, 0.30);
+  }
+  50% {
+    box-shadow:
+      0 4px 14px -2px rgba(220, 220, 224, 0.30),
+      0 0 0 8px rgba(220, 220, 224, 0.0);
+  }
+}
 
 /* Team-send — secondary surface (NOT accent). Differentiated from send
    button by the icon + label, not by competing for color attention. */
