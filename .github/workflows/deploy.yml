@@ -1,0 +1,68 @@
+# Auto-deploy both apps to Cloudflare Pages on every push to main.
+#
+# Why this and not Cloudflare's native GitHub integration:
+# CF's native GH-binding requires the cloudflare-pages GitHub App to be
+# pre-authorized for this repo (one-time dashboard click). This workflow
+# bypasses that — it uses the CF API token + wrangler to do direct uploads,
+# which works from any repo without granting GitHub OAuth permissions.
+#
+# Required repo secrets (set via `gh secret set` — see README):
+#   CLOUDFLARE_API_TOKEN   — token with Pages:Edit on this account
+#   CLOUDFLARE_ACCOUNT_ID  — the CF account that owns the Pages projects
+
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  welcome:
+    name: customer-ui → welcome.aubos.ai
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: customer-ui/package-lock.json
+      - name: install
+        run: npm ci
+        working-directory: customer-ui
+      - name: build
+        run: npm run build
+        working-directory: customer-ui
+      - name: upload to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy customer-ui/dist --project-name=aubos-welcome --branch=main
+
+  factory-admin:
+    name: command-center → factoryadmin.aubos.ai
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: command-center/package-lock.json
+      - name: install
+        run: npm ci
+        working-directory: command-center
+      - name: build
+        run: npm run build
+        working-directory: command-center
+      - name: upload to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy command-center/dist --project-name=aubos-factory-admin --branch=main
