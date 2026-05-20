@@ -466,6 +466,105 @@ const proposal_artifacts: any[] = COMPANIES_SEED
 
 const niche_templates = niches;
 
+// ─── CEO-view augmentations ───────────────────────────────────────────────
+// Add discount + ceo_approval + ceo_signed state to contract_drafts already
+// seeded above.
+function patchContract(id: string, patch: Record<string, unknown>) {
+  const idx = contract_drafts.findIndex((c: any) => c.id === id);
+  if (idx >= 0) Object.assign(contract_drafts[idx], patch);
+}
+
+// Pacific Pools: a discount pending CEO approval (Sanya proposed 25% off)
+patchContract("cd-c-pool-sign-03", {
+  list_monthly_usd: 1995,
+  monthly_usd: 1495,
+  discount_pct: 25,
+  discount_justification: "Anchor customer for cleo-for-pools — 3 referrals expected. Owner is well-known.",
+  ceo_approval_status: "pending",
+  ceo_signed_at: null,
+});
+
+// Desert Mirage Pools: approved discount, awaiting CEO signature
+patchContract("cd-c-pool-sign-04", {
+  list_monthly_usd: 1695,
+  monthly_usd: 1295,
+  discount_pct: 24,
+  discount_justification: "Multi-year LOI signed. Pricing match to nearest local competitor.",
+  ceo_approval_status: "approved",
+  ceo_approval_by: SANYA_ID,
+  ceo_approval_at: ago(1),
+  ceo_signed_at: null,
+});
+
+// Crystal Clear Pools — fully signed last week (lives in Wins feed)
+patchContract("cd-c-pool-live-01", {
+  list_monthly_usd: 1495,
+  monthly_usd: 1495,
+  discount_pct: 0,
+  ceo_approval_status: "not_required",
+  ceo_signed_at: ago(7),
+  ceo_signed_by: OUADIE_ID,
+});
+
+// Lagoon Builders — signed 30 days ago
+patchContract("cd-c-pool-live-02", {
+  list_monthly_usd: 2495,
+  monthly_usd: 1995,
+  discount_pct: 20,
+  discount_justification: "Founder-friend pricing for 12 months.",
+  ceo_approval_status: "approved",
+  ceo_approval_by: OUADIE_ID,
+  ceo_approval_at: ago(32),
+  ceo_signed_at: ago(30),
+  ceo_signed_by: OUADIE_ID,
+});
+
+// AquaArt Pools — signed 21 days ago (no discount)
+patchContract("cd-c-pool-live-03", {
+  list_monthly_usd: 995,
+  monthly_usd: 995,
+  discount_pct: 0,
+  ceo_approval_status: "not_required",
+  ceo_signed_at: ago(21),
+  ceo_signed_by: OUADIE_ID,
+});
+
+// Touchdown Tech — signed 60 days ago
+patchContract("cd-c-game-live-01", {
+  list_monthly_usd: 2995,
+  monthly_usd: 2495,
+  discount_pct: 17,
+  discount_justification: "Multi-year strategic deal — Gameday's first marquee.",
+  ceo_approval_status: "approved",
+  ceo_approval_by: OUADIE_ID,
+  ceo_approval_at: ago(62),
+  ceo_signed_at: ago(60),
+  ceo_signed_by: OUADIE_ID,
+});
+
+// CEO KPI inputs (MOCK)
+const ceo_kpi_inputs = [
+  {
+    id: "kpi-current",
+    month: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10),
+    monthly_burn_usd: 58000,
+    payroll_usd: 48000,
+    headcount: 11,
+    cash_balance_usd: 812000,
+    mrr_target_usd: 25000,
+    line_allocations: {
+      "cleo-for-pools": 22000,
+      "gameday-model": 18000,
+      "real-estate-model": 9000,
+    },
+    open_requisitions: [
+      { title: "Sr. AI engineer", manager: "V", comp_band: "$210–250k" },
+      { title: "Mid Frontend engineer", manager: "Mitanshi", comp_band: "$140–170k" },
+    ],
+    updated_at: ago(2),
+  },
+];
+
 // Scheduled calls for the calendar widget (this week)
 const aheadDays = (days: number, hour = 10) => {
   const d = new Date();
@@ -530,6 +629,7 @@ export const INITIAL_DB = {
   niche_templates,
   scheduled_calls,
   call_slot_offers,
+  ceo_kpi_inputs,
 };
 
 export const SEEDED_USER_ID = SANYA_ID;

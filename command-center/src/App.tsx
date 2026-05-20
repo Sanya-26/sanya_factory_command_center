@@ -34,6 +34,13 @@ import { ProductCustomerDetailPage } from "./pages/product/ProductCustomerDetail
 import { ProductIssuesPage } from "./pages/product/ProductIssues";
 import { ProductSettingsPage } from "./pages/product/ProductSettings";
 import { ProductFlagsPage } from "./pages/product/ProductFlags";
+import { CeoHomePage } from "./pages/ceo/CeoHome";
+import { CeoContractsPage } from "./pages/ceo/CeoContracts";
+import { CeoDiscountsPage } from "./pages/ceo/CeoDiscounts";
+import { CeoWinsPage } from "./pages/ceo/CeoWins";
+import { CeoStrategicPage } from "./pages/ceo/CeoStrategic";
+import { CeoCashPage } from "./pages/ceo/CeoCash";
+import { CeoBoardSnapshotPage } from "./pages/ceo/CeoBoardSnapshot";
 
 const OAUTH_CALLBACK_PATH = "/oauth/google-calendar/callback";
 
@@ -169,6 +176,16 @@ function PageRouter({
   role: string;
   userId: string;
 }): JSX.Element {
+  if (route.dept === "ceo") {
+    if (route.section === "home") return <CeoHomePage userId={userId} />;
+    if (route.section === "contracts") return <CeoContractsPage userId={userId} />;
+    if (route.section === "discounts") return <CeoDiscountsPage userId={userId} />;
+    if (route.section === "wins") return <CeoWinsPage />;
+    if (route.section === "strategic") return <CeoStrategicPage />;
+    if (route.section === "cash") return <CeoCashPage />;
+    if (route.section === "board") return <CeoBoardSnapshotPage />;
+    return <CeoHomePage userId={userId} />;
+  }
   if (route.dept === "product") {
     if (route.section === "home") return <ProductHomePage />;
     if (route.section === "issues") return <ProductIssuesPage userId={userId} />;
@@ -210,6 +227,21 @@ function PageRouter({
 }
 
 function buildTrail(r: Route): Array<{ label: string; onClick?: () => void }> {
+  if (r.dept === "ceo") {
+    const ceoSection: Record<string, string> = {
+      home: "Main dashboard",
+      contracts: "Contracts",
+      discounts: "Discount approvals",
+      wins: "Wins feed",
+      strategic: "Strategic comparison",
+      cash: "Cash & people",
+      board: "Board snapshot",
+    };
+    return [
+      { label: "Executive" },
+      { label: ceoSection[r.section] ?? r.section },
+    ];
+  }
   if (r.dept === "product") {
     const trail: Array<{ label: string; onClick?: () => void }> = [{ label: "Product" }];
     if (r.section === "home") return trail;

@@ -14,7 +14,7 @@ interface SectionDef {
   exactId?: string;
 }
 interface DeptDef {
-  id: "cleo" | "factory" | "product";
+  id: "cleo" | "factory" | "product" | "ceo";
   label: string;
   glyph: string;
   sections: SectionDef[];
@@ -65,6 +65,23 @@ const PRODUCT_DEPARTMENTS: DeptDef[] = [
   },
 ];
 
+const CEO_DEPARTMENTS: DeptDef[] = [
+  {
+    id: "ceo",
+    label: "Executive",
+    glyph: "★",
+    sections: [
+      { id: "home", label: "Main dashboard" },
+      { id: "contracts", label: "Contracts" },
+      { id: "discounts", label: "Discount approvals" },
+      { id: "wins", label: "Wins feed" },
+      { id: "strategic", label: "Strategic comparison" },
+      { id: "cash", label: "Cash & people" },
+      { id: "board", label: "Board snapshot" },
+    ],
+  },
+];
+
 export function Sidebar({
   route,
   email,
@@ -78,14 +95,16 @@ export function Sidebar({
   onSignOut: () => void;
 }): JSX.Element {
   const departments =
-    role === "product_manager" ? PRODUCT_DEPARTMENTS : TECH_DEPARTMENTS;
+    role === "product_manager" ? PRODUCT_DEPARTMENTS :
+    role === "ceo" ? CEO_DEPARTMENTS :
+    TECH_DEPARTMENTS;
   return (
     <aside className="shell-sidebar">
       <div className="shell-sidebar-brand">
         <div className="shell-sidebar-brand-mark">A</div>
         <div className="shell-sidebar-brand-text">
           <strong>AUBOS</strong>
-          <span>{role === "product_manager" ? "Product" : "Factory"}</span>
+          <span>{role === "product_manager" ? "Product" : role === "ceo" ? "Executive" : "Factory"}</span>
         </div>
       </div>
 

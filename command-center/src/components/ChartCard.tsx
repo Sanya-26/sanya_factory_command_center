@@ -10,7 +10,7 @@ export function ChartCard({
   height,
   children,
 }: {
-  title: string;
+  title: React.ReactNode;
   whatThisIs: string;
   whatToDo: string;
   height?: number;

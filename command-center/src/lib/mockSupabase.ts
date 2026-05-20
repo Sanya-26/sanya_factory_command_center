@@ -147,10 +147,35 @@ function computeIssuesWithFlagStats(): Row[] {
   });
 }
 
+function computeCeoContractsPending(): Row[] {
+  const compById = new Map<string, Row>();
+  for (const c of DB.companies || []) compById.set(String(c.id), c);
+  return (DB.contract_drafts || []).map((cd) => {
+    const comp = compById.get(String(cd.company_id));
+    const discount = Number(cd.discount_pct ?? 0);
+    const ceo_status = String(cd.ceo_approval_status ?? "not_required");
+    let bucket: string;
+    if (discount > 0 && ceo_status === "pending") bucket = "awaiting_discount_approval";
+    else if (
+      ["approved", "sent"].includes(String(cd.status ?? "")) &&
+      cd.ceo_signed_at == null
+    ) bucket = "awaiting_ceo_signature";
+    else if (cd.ceo_signed_at != null) bucket = "signed";
+    else bucket = "idle";
+    return {
+      ...cd,
+      company_name: comp?.name ?? cd.company_id,
+      niche: comp?.niche ?? null,
+      queue_bucket: bucket,
+    };
+  });
+}
+
 function getTableRows(table: string): Row[] {
   if (table === "v_account_health") return computeAccountHealth();
   if (table === "v_financial_summary") return computeFinancialSummary();
   if (table === "v_issues_with_flag_stats") return computeIssuesWithFlagStats();
+  if (table === "v_ceo_contracts_pending") return computeCeoContractsPending();
   return DB[table] ?? (DB[table] = []);
 }
 

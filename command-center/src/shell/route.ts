@@ -22,7 +22,7 @@
 //   product_manager → #product
 //   everyone else   → #cleo/customers
 
-export type Department = "cleo" | "factory" | "product";
+export type Department = "cleo" | "factory" | "product" | "ceo";
 
 export interface Route {
   dept: Department;
@@ -33,9 +33,12 @@ export interface Route {
 
 export const DEFAULT_ROUTE_TECH: Route = { dept: "cleo", section: "command-center" };
 export const DEFAULT_ROUTE_PRODUCT: Route = { dept: "product", section: "home" };
+export const DEFAULT_ROUTE_CEO: Route = { dept: "ceo", section: "home" };
 
 export function defaultRouteFor(role: string | null): Route {
-  return role === "product_manager" ? DEFAULT_ROUTE_PRODUCT : DEFAULT_ROUTE_TECH;
+  if (role === "product_manager") return DEFAULT_ROUTE_PRODUCT;
+  if (role === "ceo") return DEFAULT_ROUTE_CEO;
+  return DEFAULT_ROUTE_TECH;
 }
 
 export function parseHash(hash: string): Route | null {
@@ -43,7 +46,7 @@ export function parseHash(hash: string): Route | null {
   if (!stripped) return null;
   const parts = stripped.split("/").filter(Boolean);
   const dept = parts[0] as Department;
-  if (dept !== "cleo" && dept !== "factory" && dept !== "product") return null;
+  if (dept !== "cleo" && dept !== "factory" && dept !== "product" && dept !== "ceo") return null;
   return {
     dept,
     section:

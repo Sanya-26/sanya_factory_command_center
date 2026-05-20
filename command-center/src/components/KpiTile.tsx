@@ -9,7 +9,7 @@ export function KpiTile({
   valueColor,
   insight,
 }: {
-  label: string;
+  label: React.ReactNode;
   value: string;
   valueColor?: string;
   insight?: string;
