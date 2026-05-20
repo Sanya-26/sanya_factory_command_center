@@ -5,6 +5,7 @@
 
 import type { Route } from "./route";
 import { navigate } from "./route";
+import { isMockBackend, resetMockDB } from "../lib/factorySupabase";
 
 interface SectionDef {
   id: string;
@@ -114,6 +115,45 @@ export function Sidebar({
       </nav>
 
       <div className="shell-sidebar-footer">
+        {isMockBackend() ? (
+          <div
+            style={{
+              background: "#fef3c7",
+              color: "#92400e",
+              border: "1px solid #fde68a",
+              borderRadius: 6,
+              padding: "6px 8px",
+              fontSize: 11,
+              marginBottom: 8,
+              display: "flex",
+              flexDirection: "column",
+              gap: 4,
+            }}
+            title="VITE_DATA_BACKEND=mock"
+          >
+            <span>🧪 Local mock data</span>
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm("Wipe local mock DB and re-seed?")) {
+                  resetMockDB();
+                  window.location.reload();
+                }
+              }}
+              style={{
+                background: "transparent",
+                border: "1px solid #fde68a",
+                borderRadius: 4,
+                color: "#92400e",
+                fontSize: 11,
+                padding: "2px 6px",
+                cursor: "pointer",
+              }}
+            >
+              Reset & reseed
+            </button>
+          </div>
+        ) : null}
         <span className="shell-sidebar-email" title={email}>{email}</span>
         <span className="shell-sidebar-role-tag">{role}</span>
         <button type="button" className="shell-sidebar-signout" onClick={onSignOut}>

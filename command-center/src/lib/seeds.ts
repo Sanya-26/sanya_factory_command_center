@@ -1,0 +1,399 @@
+// Local-only seed fixtures backing the mock Supabase client.
+// See docs/PRD-product-view.md §13.3 for the data shape.
+//
+// Every id below is a deterministic string so localStorage stays stable across
+// resets. Real production data never touches this file.
+
+const SANYA_ID = "171b0964-0273-4b74-8f71-0ca5c947f88a"; // real ops_user.id
+const MITANSHI_ID = "u-mitanshi-0000-0000-0000-000000000001";
+const ADAM_ID = "u-adam-0000-0000-0000-000000000002";
+const V_ID = "u-v-cto-0000-0000-0000-000000000003";
+const OUADIE_ID = "u-ouadie-ceo-0000-0000-0000-00000004";
+
+const now = Date.now();
+const ago = (days: number) => new Date(now - days * 86400_000).toISOString();
+
+interface CompanySeed {
+  id: string;
+  name: string;
+  niche: string;
+  email: string;
+  stage_slug: string;
+  monthly_usd?: number;
+  flags?: Array<{ severity: "low" | "medium" | "high" | "critical"; title: string; daysAgo: number; status?: "open" | "resolved" }>;
+  events?: Array<{ event_kind: string; daysAgo: number; actor?: string; payload?: Record<string, unknown> }>;
+  has_checklist?: boolean;
+  has_decision?: "approve" | "bugs";
+  active_issue?: { title: string; severity: "low" | "medium" | "high" | "critical"; priority: "normal" | "high" | "urgent"; assignee: string };
+}
+
+const COMPANIES_SEED: CompanySeed[] = [
+  // ─── Cleo for Pools ────────────────────────────────────────────────
+  // 3 live
+  {
+    id: "c-pool-live-01", name: "Crystal Clear Pools", niche: "cleo-for-pools",
+    email: "ops@crystalclearpools.com", stage_slug: "live", monthly_usd: 1495,
+    flags: [{ severity: "medium", title: "Lead form sometimes double-submits", daysAgo: 3, status: "open" }],
+    events: [
+      { event_kind: "onboarding_complete", daysAgo: 45, actor: "system" },
+      { event_kind: "first_lead", daysAgo: 30, actor: "tenant_runtime" },
+      { event_kind: "support_request", daysAgo: 3, actor: "customer", payload: { topic: "double-submit" } },
+    ],
+  },
+  {
+    id: "c-pool-live-02", name: "Lagoon Builders", niche: "cleo-for-pools",
+    email: "hello@lagoonbuilders.com", stage_slug: "live", monthly_usd: 1995,
+    events: [
+      { event_kind: "onboarding_complete", daysAgo: 90, actor: "system" },
+      { event_kind: "monthly_review_passed", daysAgo: 6, actor: "system" },
+    ],
+  },
+  {
+    id: "c-pool-live-03", name: "AquaArt Pools", niche: "cleo-for-pools",
+    email: "team@aquaartpools.com", stage_slug: "live", monthly_usd: 995,
+    flags: [
+      { severity: "high", title: "Map renders broken on Safari mobile", daysAgo: 1, status: "open" },
+      { severity: "low", title: "Logo color off by 5%", daysAgo: 14, status: "resolved" },
+    ],
+    events: [
+      { event_kind: "onboarding_complete", daysAgo: 21, actor: "system" },
+      { event_kind: "support_request", daysAgo: 1, actor: "customer" },
+    ],
+  },
+  // 1 audit
+  {
+    id: "c-pool-audit-01", name: "Splash Masters", niche: "cleo-for-pools",
+    email: "ops@splashmasters.com", stage_slug: "sanya-audit", monthly_usd: 1495,
+    has_checklist: true,
+    events: [
+      { event_kind: "tenant_deployed", daysAgo: 2, actor: "factory" },
+      { event_kind: "qc_checklist_generated", daysAgo: 1, actor: "qc_agent" },
+    ],
+  },
+  // 2 build
+  {
+    id: "c-pool-build-01", name: "BlueWave Inc", niche: "cleo-for-pools",
+    email: "founders@bluewave.com", stage_slug: "building", monthly_usd: 1295,
+    active_issue: { title: "Hero image upload fails > 5MB", severity: "high", priority: "high", assignee: MITANSHI_ID },
+    events: [
+      { event_kind: "build_started", daysAgo: 5, actor: "factory" },
+      { event_kind: "ticket_assigned", daysAgo: 1, actor: "sanya", payload: { ticket: "hero-upload" } },
+    ],
+  },
+  {
+    id: "c-pool-build-02", name: "Sunbelt Pools", niche: "cleo-for-pools",
+    email: "hi@sunbeltpools.com", stage_slug: "deployed", monthly_usd: 1495,
+    events: [
+      { event_kind: "build_completed", daysAgo: 1, actor: "factory" },
+      { event_kind: "tenant_deployed", daysAgo: 1, actor: "factory" },
+    ],
+  },
+  // 4 sign
+  {
+    id: "c-pool-sign-01", name: "Backyard Oasis", niche: "cleo-for-pools",
+    email: "owner@backyardoasis.com", stage_slug: "intake", monthly_usd: 1295,
+    events: [{ event_kind: "signup", daysAgo: 0, actor: "customer" }],
+  },
+  {
+    id: "c-pool-sign-02", name: "Cascade Pools", niche: "cleo-for-pools",
+    email: "team@cascadepools.com", stage_slug: "council", monthly_usd: 1495,
+    events: [
+      { event_kind: "signup", daysAgo: 2, actor: "customer" },
+      { event_kind: "council_started", daysAgo: 1, actor: "system" },
+    ],
+  },
+  {
+    id: "c-pool-sign-03", name: "Pacific Pools", niche: "cleo-for-pools",
+    email: "ops@pacificpools.com", stage_slug: "proposal", monthly_usd: 1495,
+    events: [
+      { event_kind: "signup", daysAgo: 6, actor: "customer" },
+      { event_kind: "council_complete", daysAgo: 4, actor: "system" },
+      { event_kind: "proposal_drafted", daysAgo: 1, actor: "proposal_agent" },
+    ],
+  },
+  {
+    id: "c-pool-sign-04", name: "Desert Mirage Pools", niche: "cleo-for-pools",
+    email: "info@desertmirage.com", stage_slug: "awaiting-approval", monthly_usd: 1295,
+    flags: [{ severity: "medium", title: "Asked for warranty clarification", daysAgo: 2, status: "open" }],
+    events: [
+      { event_kind: "signup", daysAgo: 10, actor: "customer" },
+      { event_kind: "proposal_sent", daysAgo: 3, actor: "sanya" },
+      { event_kind: "contract_sent", daysAgo: 1, actor: "sanya" },
+    ],
+  },
+  // ─── Gameday Model ────────────────────────────────────────────────
+  {
+    id: "c-game-live-01", name: "Touchdown Tech", niche: "gameday-model",
+    email: "ceo@touchdowntech.com", stage_slug: "live", monthly_usd: 2495,
+    events: [
+      { event_kind: "onboarding_complete", daysAgo: 60, actor: "system" },
+      { event_kind: "feature_request", daysAgo: 5, actor: "customer", payload: { topic: "live-scoring" } },
+    ],
+  },
+  {
+    id: "c-game-audit-01", name: "Stadium Stream", niche: "gameday-model",
+    email: "hello@stadiumstream.com", stage_slug: "sanya-audit", monthly_usd: 1995,
+    has_checklist: true, has_decision: "bugs",
+    events: [
+      { event_kind: "tenant_deployed", daysAgo: 4, actor: "factory" },
+      { event_kind: "audit_bugs_filed", daysAgo: 1, actor: "sanya" },
+    ],
+  },
+  {
+    id: "c-game-build-01", name: "GameOn Analytics", niche: "gameday-model",
+    email: "team@gameon.io", stage_slug: "planning", monthly_usd: 2295,
+    active_issue: { title: "Spec ambiguity on stats schema", severity: "medium", priority: "normal", assignee: ADAM_ID },
+    events: [
+      { event_kind: "build_planning", daysAgo: 3, actor: "factory" },
+    ],
+  },
+  {
+    id: "c-game-sign-01", name: "PlayTracker", niche: "gameday-model",
+    email: "founders@playtracker.com", stage_slug: "proposal", monthly_usd: 1795,
+    events: [{ event_kind: "signup", daysAgo: 5, actor: "customer" }],
+  },
+  {
+    id: "c-game-sign-02", name: "ScoreboardAI", niche: "gameday-model",
+    email: "hi@scoreboardai.com", stage_slug: "intake", monthly_usd: 1995,
+    events: [{ event_kind: "signup", daysAgo: 1, actor: "customer" }],
+  },
+  // ─── Real Estate Model ────────────────────────────────────────────
+  {
+    id: "c-re-build-01", name: "Listing Lens", niche: "real-estate-model",
+    email: "team@listinglens.co", stage_slug: "queued", monthly_usd: 1795,
+    events: [
+      { event_kind: "signup", daysAgo: 8, actor: "customer" },
+      { event_kind: "build_queued", daysAgo: 1, actor: "factory" },
+    ],
+  },
+  {
+    id: "c-re-sign-01", name: "HomeWise", niche: "real-estate-model",
+    email: "ceo@homewise.io", stage_slug: "intake", monthly_usd: 1495,
+    events: [{ event_kind: "signup", daysAgo: 2, actor: "customer" }],
+  },
+  {
+    id: "c-re-sign-02", name: "PropTour AI", niche: "real-estate-model",
+    email: "team@proptour.ai", stage_slug: "council", monthly_usd: 1995,
+    events: [
+      { event_kind: "signup", daysAgo: 4, actor: "customer" },
+      { event_kind: "council_started", daysAgo: 2, actor: "system" },
+    ],
+  },
+  {
+    id: "c-re-sign-03", name: "RealAgent", niche: "real-estate-model",
+    email: "ops@realagent.app", stage_slug: "proposal", monthly_usd: 1595,
+    events: [
+      { event_kind: "signup", daysAgo: 6, actor: "customer" },
+      { event_kind: "proposal_drafted", daysAgo: 1, actor: "proposal_agent" },
+    ],
+  },
+];
+
+const opsUsers = [
+  { user_id: SANYA_ID, role: "product_manager", slack_user_id: "U0SANYA" },
+  { user_id: MITANSHI_ID, role: "tech", slack_user_id: "U0MITANSHI" },
+  { user_id: ADAM_ID, role: "tech", slack_user_id: "U0ADAM" },
+  { user_id: V_ID, role: "cto", slack_user_id: "U0V" },
+  { user_id: OUADIE_ID, role: "ceo", slack_user_id: "U0OUADIE" },
+];
+
+const niches = [
+  { niche_slug: "cleo-for-pools", display_name: "Cleo for Pools" },
+  { niche_slug: "gameday-model", display_name: "Gameday Model" },
+  { niche_slug: "real-estate-model", display_name: "Real Estate Model" },
+];
+
+// Build derived rows
+const companies = COMPANIES_SEED.map((c) => ({
+  id: c.id,
+  name: c.name,
+  niche: c.niche,
+  email: c.email,
+  monthly_usd: c.monthly_usd,
+  created_at: ago(20),
+}));
+
+const stageRuns = COMPANIES_SEED.map((c, i) => ({
+  id: `stage-${i}`,
+  project_id: c.id,
+  lifecycle_plan_id: `plan-${c.niche}`,
+  stage_slug: c.stage_slug,
+  order_index: 1,
+  status: c.stage_slug === "live" ? "completed" : "active",
+  updated_at: ago(1),
+  started_at: ago(2),
+  completed_at: c.stage_slug === "live" ? ago(1) : null,
+}));
+
+const customer_flags: any[] = [];
+COMPANIES_SEED.forEach((c) => {
+  (c.flags ?? []).forEach((f, fi) => {
+    customer_flags.push({
+      id: `flag-${c.id}-${fi}`,
+      company_id: c.id,
+      reported_at: ago(f.daysAgo),
+      source: "manual",
+      severity: f.severity,
+      title: f.title,
+      body: null,
+      status: f.status ?? "open",
+      resolved_at: f.status === "resolved" ? ago(Math.max(0, f.daysAgo - 1)) : null,
+      created_at: ago(f.daysAgo),
+    });
+  });
+});
+
+const client_journey_events: any[] = [];
+COMPANIES_SEED.forEach((c) => {
+  (c.events ?? []).forEach((e, ei) => {
+    client_journey_events.push({
+      id: `evt-${c.id}-${ei}`,
+      company_id: c.id,
+      event_kind: e.event_kind,
+      at: ago(e.daysAgo),
+      created_at: ago(e.daysAgo),
+      actor: e.actor ?? "system",
+      payload: e.payload ?? {},
+    });
+  });
+});
+
+const audit_checklists: any[] = [];
+COMPANIES_SEED.filter((c) => c.has_checklist).forEach((c) => {
+  audit_checklists.push({
+    id: `chk-${c.id}`,
+    company_id: c.id,
+    generated_at: ago(1),
+    generated_by: "qc_agent:stub",
+    is_current: true,
+    signed_off_by: null,
+    signed_off_at: null,
+    items: [
+      { id: "smoke-home", label: "Home page loads cleanly", expected: "200 + branded layout", status: "pass" },
+      { id: "smoke-signup", label: "Customer signup flow works", expected: "Lands on /onboarding", status: "pass" },
+      { id: "smoke-search", label: "Search for a service returns results", expected: "Non-empty list", status: "pending" },
+      { id: "smoke-quote", label: "Quote request submits cleanly", expected: "Confirmation page", status: "pending" },
+      { id: "smoke-cms", label: "CMS shows latest data", expected: "Matches Supabase", status: "pending" },
+      { id: "smoke-mobile", label: "Mobile responsive (iPhone SE)", expected: "No horizontal scroll", status: "pending" },
+      { id: "smoke-perf", label: "LCP < 2.5s on 3G", expected: "Lighthouse score", status: "pending" },
+      { id: "smoke-a11y", label: "Axe critical/serious = 0", expected: "Zero", status: "pending" },
+    ],
+  });
+});
+
+const tech_issues: any[] = [];
+COMPANIES_SEED.forEach((c) => {
+  if (c.active_issue) {
+    tech_issues.push({
+      id: `ti-${c.id}`,
+      company_id: c.id,
+      build_run_id: null,
+      raised_by: SANYA_ID,
+      assignee_id: c.active_issue.assignee,
+      title: c.active_issue.title,
+      description: null,
+      severity: c.active_issue.severity,
+      priority: c.active_issue.priority,
+      status: "open",
+      mirrored_alert_id: null,
+      created_at: ago(1),
+      updated_at: ago(1),
+      closed_at: null,
+    });
+  }
+});
+// Add an extra "done" issue for variety
+tech_issues.push({
+  id: "ti-done-01",
+  company_id: "c-pool-live-01",
+  raised_by: SANYA_ID,
+  assignee_id: ADAM_ID,
+  title: "Footer copyright year wrong",
+  description: "Showed 2024 instead of current.",
+  severity: "low",
+  priority: "normal",
+  status: "done",
+  created_at: ago(14),
+  updated_at: ago(13),
+  closed_at: ago(13),
+});
+
+const sanya_audit_decisions: any[] = [];
+COMPANIES_SEED.filter((c) => c.has_decision).forEach((c) => {
+  sanya_audit_decisions.push({
+    id: `dec-${c.id}`,
+    company_id: c.id,
+    decision: c.has_decision!,
+    notes: c.has_decision === "bugs" ? "Spotted 3 layout bugs and 1 broken link." : "All checks passed.",
+    bug_issue_ids: [],
+    decided_by: SANYA_ID,
+    decided_at: ago(1),
+  });
+});
+
+const outbound_emails = [
+  { id: "em-1", company_id: "c-pool-sign-03", recipient_email: "ops@pacificpools.com", template: "proposal_send", payload: {}, status: "sent", provider: "stub", provider_message_id: "stub-1", sent_at: ago(1), created_at: ago(1) },
+  { id: "em-2", company_id: "c-pool-sign-04", recipient_email: "info@desertmirage.com", template: "contract_send", payload: {}, status: "sent", provider: "stub", provider_message_id: "stub-2", sent_at: ago(1), created_at: ago(1) },
+  { id: "em-3", company_id: "c-pool-audit-01", recipient_email: "ops@splashmasters.com", template: "audit_invite", payload: {}, status: "sent", provider: "stub", provider_message_id: "stub-3", sent_at: ago(1), created_at: ago(1) },
+];
+
+const notifications = [
+  { id: "n-1", recipient_user_id: SANYA_ID, kind: "map-ready", severity: "info", title: "Map ready for Splash Masters", body: null, related_company_id: "c-pool-audit-01", read_at: null, created_at: ago(1) },
+  { id: "n-2", recipient_user_id: SANYA_ID, kind: "integrations-ready", severity: "info", title: "Integrations ready for Sunbelt Pools", body: null, related_company_id: "c-pool-build-02", read_at: null, created_at: ago(0.5) },
+];
+
+const contract_drafts: any[] = [];
+COMPANIES_SEED.filter((c) => ["awaiting-approval", "proposal", "live", "sanya-audit"].includes(c.stage_slug)).forEach((c, i) => {
+  contract_drafts.push({
+    id: `cd-${c.id}`,
+    company_id: c.id,
+    build_run_id: null,
+    tenant_slug: null,
+    monthly_usd: c.monthly_usd ?? 1500,
+    tier_slug: "standard",
+    contract_md: `# Contract for ${c.name}\n\nStandard CLEO SaaS agreement.\n\n## Term\n12 months auto-renewing.`,
+    clauses: [],
+    jurisdiction: "US-DE",
+    status: c.stage_slug === "live" || c.stage_slug === "sanya-audit" ? "signed" : c.stage_slug === "awaiting-approval" ? "sent" : "draft",
+    sent_at: ago(2),
+    signed_at: c.stage_slug === "live" || c.stage_slug === "sanya-audit" ? ago(1) : null,
+    signature_url: null,
+    cost_usd: 0,
+    generated_at: ago(3),
+    updated_at: ago(2),
+  });
+});
+
+const proposal_artifacts: any[] = COMPANIES_SEED
+  .filter((c) => ["proposal", "awaiting-approval", "sanya-audit", "live"].includes(c.stage_slug))
+  .map((c, i) => ({
+    id: `pa-${c.id}`,
+    company_id: c.id,
+    kind: "synopsis",
+    version: 1,
+    storage_path: `synopsis/${c.id}/v1.md`,
+    generated_by: "synopsis_agent:stub",
+    generated_at: ago(2),
+    released_to_client_at: null,
+  }));
+
+const niche_templates = niches;
+
+export const INITIAL_DB = {
+  companies,
+  ops_users: opsUsers,
+  project_lifecycle_stage_runs: stageRuns,
+  customer_flags,
+  client_journey_events,
+  audit_checklists,
+  tech_issues,
+  sanya_audit_decisions,
+  outbound_emails,
+  notifications,
+  contract_drafts,
+  proposal_artifacts,
+  niche_templates,
+};
+
+export const SEEDED_USER_ID = SANYA_ID;
+export const SEEDED_USER_EMAIL = "sanya@aubos.ai";

@@ -1,10 +1,12 @@
-// Product · Per-customer detail with 3-phase panel + audit decision buttons.
+// Product · Per-customer detail — 3-phase panels + decisions + activity sidebar + stage stepper.
 
 import { useEffect, useState } from "react";
 import { getFactorySupabase } from "../../lib/factorySupabase";
 import { navigate } from "../../shell/route";
 import { labelFor, phaseFor } from "../../lib/stage-labels";
 import { STATUS_COLOR, type HealthStatus } from "../../lib/health-score";
+import { StageStepper } from "../../components/charts/StageStepper";
+import { ActivityTimeline } from "../../components/charts/ActivityTimeline";
 
 interface Company {
   id: string;
@@ -25,6 +27,13 @@ interface ChecklistItem {
   status?: "pending" | "pass" | "fail";
   note?: string;
 }
+interface Event {
+  id: string;
+  event_kind: string;
+  at: string;
+  actor: string | null;
+  payload?: Record<string, unknown> | null;
+}
 
 export function ProductCustomerDetailPage({
   niche,
@@ -39,6 +48,8 @@ export function ProductCustomerDetailPage({
   const [stage, setStage] = useState<StageRun | null>(null);
   const [health, setHealth] = useState<HealthStatus>("green");
   const [checklist, setChecklist] = useState<{ id: string; items: ChecklistItem[] } | null>(null);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [flags, setFlags] = useState<number>(0);
   const [decisionState, setDecisionState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [decisionError, setDecisionError] = useState<string | null>(null);
 
@@ -46,17 +57,21 @@ export function ProductCustomerDetailPage({
     let cancelled = false;
     void (async () => {
       const sb = getFactorySupabase();
-      const [{ data: c }, { data: stages }, { data: hRows }, { data: chk }] = await Promise.all([
+      const [{ data: c }, { data: stages }, { data: hRows }, { data: chk }, { data: evs }, { data: openFlags }] = await Promise.all([
         sb.from("companies").select("id, name, email, niche").eq("id", companyId).maybeSingle(),
-        sb.from("project_lifecycle_stage_runs").select("stage_slug, status, started_at, completed_at").eq("project_id", companyId).order("updated_at", { ascending: false }).limit(1),
+        sb.from("project_lifecycle_stage_runs").select("stage_slug, status, started_at, completed_at, updated_at").eq("project_id", companyId).order("updated_at", { ascending: false }).limit(1),
         sb.from("v_account_health").select("status").eq("company_id", companyId).maybeSingle(),
         sb.from("audit_checklists").select("id, items").eq("company_id", companyId).eq("is_current", true).maybeSingle(),
+        sb.from("client_journey_events").select("id, event_kind, at, actor, payload").eq("company_id", companyId).order("at", { ascending: false }).limit(15),
+        sb.from("customer_flags").select("id").eq("company_id", companyId).eq("status", "open"),
       ]);
       if (cancelled) return;
       setCompany((c ?? null) as Company | null);
       setStage(((stages ?? [])[0] ?? null) as StageRun | null);
       if (hRows) setHealth((hRows as { status: HealthStatus }).status);
       if (chk) setChecklist(chk as { id: string; items: ChecklistItem[] });
+      setEvents((evs ?? []) as Event[]);
+      setFlags(((openFlags ?? []) as unknown[]).length);
     })();
     return () => { cancelled = true; };
   }, [companyId]);
@@ -64,7 +79,7 @@ export function ProductCustomerDetailPage({
   const currentPhase = phaseFor(stage?.stage_slug);
 
   return (
-    <div style={{ padding: 24, display: "grid", gap: 16, maxWidth: 960 }}>
+    <div style={{ padding: 24, display: "grid", gap: 16, maxWidth: 1240 }}>
       <header style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <button type="button" className="btn-ghost" onClick={() => navigate({ dept: "product", section: niche })}>
           ← Back
@@ -73,74 +88,74 @@ export function ProductCustomerDetailPage({
         <span style={{ background: "#f3f4f6", padding: "2px 8px", borderRadius: 4, fontSize: 12 }}>
           {labelFor(stage?.stage_slug)}
         </span>
-        <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6 }}>
+        {flags > 0 ? (
+          <span style={{ background: "#fee2e2", color: "#b91c1c", padding: "2px 8px", borderRadius: 999, fontSize: 12 }}>
+            {flags} open flag{flags === 1 ? "" : "s"}
+          </span>
+        ) : null}
+        <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13 }}>
           <span style={{ width: 10, height: 10, borderRadius: 999, background: STATUS_COLOR[health] }} />
-          Health
+          {health.toUpperCase()}
         </span>
       </header>
 
-      <Panel
-        title="Phase 1 — Map → Contract Signed"
-        active={currentPhase === "phase1"}
-      >
-        <ActionRow label="Map" onClick={() => alert("Map viewer (renders onboarding_canvas_states.canvas_json) — wire next")} />
-        <ActionRow label="Synopsis" onClick={() => alert("Synopsis viewer (proposal_artifacts.kind='synopsis') — wire next")} />
-        <ActionRow
-          label="Proposal"
-          onClick={() => alert("Proposal viewer + Send via email")}
-          secondaryLabel="Send proposal"
-          onSecondary={() => sendEmail({ companyId, template: "proposal_send", to: company?.email })}
-        />
-        <ActionRow
-          label="Contract"
-          onClick={() => navigate({ dept: "cleo", section: "command-center", id: companyId, sub: "contract" })}
-          secondaryLabel="Send contract"
-          onSecondary={() => sendEmail({ companyId, template: "contract_send", to: company?.email })}
-        />
-        <ActionRow
-          label="Schedule call"
-          secondaryLabel="Send invite"
-          onSecondary={() => sendEmail({ companyId, template: "schedule_call", to: company?.email })}
-        />
-      </Panel>
+      <StageStepper currentStage={stage?.stage_slug} />
 
-      <Panel title="Phase 2 — Factory producing → Integrations" active={currentPhase === "phase2"}>
-        <ActionRow label="Production link" onClick={() => alert("opens tenant_runtimes.tenant_customer_ui_url")} />
-        <ActionRow label="Integrations list" onClick={() => navigate({ dept: "cleo", section: "customers", id: companyId, sub: "integrations" })} />
-        <ActionRow
-          label="Account credentials"
-          onClick={() => alert("View credentials (from customer_secrets / tenant_runtimes)")}
-          secondaryLabel="Email credentials"
-          onSecondary={() => sendEmail({ companyId, template: "credentials_send", to: company?.email })}
-        />
-        <ActionRow label="QC sign-off" onClick={() => alert("Reads cleo_self_tests for tenant — signer + timestamp")} />
-      </Panel>
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16 }}>
+        <div style={{ display: "grid", gap: 16 }}>
+          <Panel title="Phase 1 — Map → Contract Signed" active={currentPhase === "phase1"}>
+            <ActionRow label="Map" onClick={() => alert("Map viewer (onboarding_canvas_states.canvas)")} />
+            <ActionRow label="Synopsis" onClick={() => alert("Synopsis (proposal_artifacts kind=synopsis)")} />
+            <ActionRow label="Proposal" onClick={() => alert("Proposal viewer")} secondaryLabel="Send proposal" onSecondary={() => sendEmail({ companyId, template: "proposal_send", to: company?.email })} />
+            <ActionRow label="Contract" onClick={() => navigate({ dept: "cleo", section: "command-center", id: companyId, sub: "contract" })} secondaryLabel="Send contract" onSecondary={() => sendEmail({ companyId, template: "contract_send", to: company?.email })} />
+            <ActionRow label="Schedule call" secondaryLabel="Send invite" onSecondary={() => sendEmail({ companyId, template: "schedule_call", to: company?.email })} />
+          </Panel>
 
-      <Panel title="Phase 3 — Audit (Sanya)" active={currentPhase === "phase3"}>
-        {!checklist ? (
-          <p style={{ color: "#9ca3af", fontStyle: "italic" }}>No checklist generated yet. Reaches this phase once tenant deploys.</p>
-        ) : (
-          <Checklist
-            checklist={checklist}
-            onChange={(items) => setChecklist({ ...checklist, items })}
-          />
-        )}
-        <DecisionButtons
-          companyId={companyId}
-          userId={userId}
-          state={decisionState}
-          error={decisionError}
-          onState={(s, e) => { setDecisionState(s); setDecisionError(e ?? null); }}
-        />
-      </Panel>
+          <Panel title="Phase 2 — Factory producing → Integrations" active={currentPhase === "phase2"}>
+            <ActionRow label="Production link" onClick={() => alert("tenant_runtimes.tenant_customer_ui_url")} />
+            <ActionRow label="Integrations list" onClick={() => navigate({ dept: "cleo", section: "customers", id: companyId, sub: "integrations" })} />
+            <ActionRow label="Account credentials" onClick={() => alert("View credentials")} secondaryLabel="Email credentials" onSecondary={() => sendEmail({ companyId, template: "credentials_send", to: company?.email })} />
+            <ActionRow label="QC sign-off" onClick={() => alert("Reads cleo_self_tests for tenant")} />
+          </Panel>
 
-      <Panel title="Live" active={currentPhase === "live"}>
-        <p style={{ color: "#6b7280", margin: 0 }}>
-          Health: <strong style={{ color: STATUS_COLOR[health] }}>{health.toUpperCase()}</strong>. View flags, issues, latest audit findings.
-        </p>
-        <ActionRow label="Open issues" onClick={() => navigate({ dept: "product", section: "issues" })} />
-        <ActionRow label="View flags" onClick={() => navigate({ dept: "product", section: niche, id: "flags" })} />
-      </Panel>
+          <Panel title="Phase 3 — Audit (Sanya)" active={currentPhase === "phase3"}>
+            {!checklist ? (
+              <p style={{ color: "#9ca3af", fontStyle: "italic", margin: 0 }}>No checklist generated yet. Reaches this phase once tenant deploys.</p>
+            ) : (
+              <Checklist checklist={checklist} onChange={(items) => setChecklist({ ...checklist, items })} />
+            )}
+            <DecisionButtons
+              companyId={companyId}
+              userId={userId}
+              state={decisionState}
+              error={decisionError}
+              onState={(s, e) => { setDecisionState(s); setDecisionError(e ?? null); }}
+            />
+          </Panel>
+
+          <Panel title="Live" active={currentPhase === "live"}>
+            <p style={{ color: "#6b7280", margin: 0, fontSize: 13 }}>
+              Health: <strong style={{ color: STATUS_COLOR[health] }}>{health.toUpperCase()}</strong>. View flags, issues, latest audit findings.
+            </p>
+            <ActionRow label="Open issues" onClick={() => navigate({ dept: "product", section: "issues" })} />
+            <ActionRow label="View flags" onClick={() => navigate({ dept: "product", section: niche, id: "flags" })} />
+          </Panel>
+        </div>
+
+        <aside style={{ display: "grid", gap: 16, alignContent: "start" }}>
+          <ActivityTimeline events={events} />
+          <div style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
+            <div style={{ color: "#6b7280", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+              Quick actions
+            </div>
+            <div style={{ display: "grid", gap: 6 }}>
+              <button type="button" className="btn" onClick={() => navigate({ dept: "product", section: "issues" })} style={{ fontSize: 13 }}>+ File an issue</button>
+              <button type="button" className="btn" onClick={() => navigate({ dept: "product", section: niche, id: "flags" })} style={{ fontSize: 13 }}>View this niche's flags</button>
+              <button type="button" className="btn-ghost" onClick={() => alert("Coming soon: pause runtime")} style={{ fontSize: 13 }}>⏸ Pause runtime</button>
+            </div>
+          </div>
+        </aside>
+      </div>
     </div>
   );
 }
@@ -154,7 +169,7 @@ function Panel({ title, active, children }: { title: string; active: boolean; ch
       borderRadius: 8,
       padding: 16,
     }}>
-      <h2 style={{ margin: 0, marginBottom: 12, fontSize: 16 }}>{title}</h2>
+      <h2 style={{ margin: 0, marginBottom: 12, fontSize: 15 }}>{title}</h2>
       <div style={{ display: "grid", gap: 8 }}>{children}</div>
     </section>
   );
@@ -198,11 +213,15 @@ function Checklist({
     const sb = getFactorySupabase();
     await sb.from("audit_checklists").update({ items: checklist.items }).eq("id", checklist.id);
   }
+  const passCount = checklist.items.filter((i) => i.status === "pass").length;
   return (
     <div>
+      <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 8 }}>
+        {passCount} / {checklist.items.length} passing
+      </div>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
         <thead>
-          <tr style={{ textAlign: "left", color: "#6b7280" }}>
+          <tr style={{ textAlign: "left", color: "#6b7280", fontSize: 12 }}>
             <th style={{ padding: 6 }}>Check</th>
             <th style={{ padding: 6 }}>Expected</th>
             <th style={{ padding: 6, width: 110 }}>Status</th>
@@ -213,7 +232,7 @@ function Checklist({
           {checklist.items.map((it, i) => (
             <tr key={it.id ?? i} style={{ borderTop: "1px solid #f3f4f6" }}>
               <td style={{ padding: 6 }}>{it.label}</td>
-              <td style={{ padding: 6, color: "#6b7280" }}>{it.expected ?? "—"}</td>
+              <td style={{ padding: 6, color: "#9ca3af" }}>{it.expected ?? "—"}</td>
               <td style={{ padding: 6 }}>
                 <select
                   value={it.status ?? "pending"}
@@ -230,14 +249,14 @@ function Checklist({
                   value={it.note ?? ""}
                   placeholder="note"
                   onChange={(e) => update(i, { note: e.target.value })}
-                  style={{ width: "100%" }}
+                  style={{ width: "100%", padding: 4, border: "1px solid #e5e7eb", borderRadius: 4, fontSize: 12 }}
                 />
               </td>
             </tr>
           ))}
         </tbody>
       </table>
-      <button type="button" className="btn" onClick={() => void save()} style={{ marginTop: 8 }}>
+      <button type="button" className="btn" onClick={() => void save()} style={{ marginTop: 8, fontSize: 12 }}>
         Save checklist
       </button>
     </div>
@@ -268,15 +287,9 @@ function DecisionButtons({
         decided_by: userId,
       });
       if (insErr) throw insErr;
-      // For 'approve', advance lifecycle stage_run to 'live'.
       if (decision === "approve") {
-        await sb
-          .from("project_lifecycle_stage_runs")
-          .update({ status: "completed", completed_at: new Date().toISOString() })
-          .eq("project_id", companyId)
-          .eq("stage_slug", "sanya-audit");
+        await sb.from("project_lifecycle_stage_runs").update({ stage_slug: "live", status: "completed", completed_at: new Date().toISOString() }).eq("project_id", companyId);
       }
-      // For 'bugs' or 'disapprove', insert notifications.
       if (decision === "bugs") {
         await sb.from("notifications").insert({
           recipient_user_id: userId,
@@ -303,35 +316,14 @@ function DecisionButtons({
     }
   }
   return (
-    <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-      <button
-        type="button"
-        onClick={() => void decide("approve")}
-        disabled={state === "saving"}
-        style={{ padding: "6px 14px", background: "#10b981", color: "white", border: "none", borderRadius: 6, cursor: "pointer" }}
-      >
+    <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+      <button type="button" onClick={() => void decide("approve")} disabled={state === "saving"} style={{ padding: "6px 14px", background: "#10b981", color: "white", border: "none", borderRadius: 6, cursor: "pointer" }}>
         ✓ Approve
       </button>
-      <button
-        type="button"
-        onClick={() => {
-          const n = window.prompt("Describe the bugs (will assign to tech team via tech_issues):");
-          if (n !== null) void decide("bugs", n);
-        }}
-        disabled={state === "saving"}
-        style={{ padding: "6px 14px", background: "#f59e0b", color: "white", border: "none", borderRadius: 6, cursor: "pointer" }}
-      >
+      <button type="button" onClick={() => { const n = window.prompt("Describe the bugs (assigns to tech team):"); if (n !== null) void decide("bugs", n); }} disabled={state === "saving"} style={{ padding: "6px 14px", background: "#f59e0b", color: "white", border: "none", borderRadius: 6, cursor: "pointer" }}>
         ✕ Bugs
       </button>
-      <button
-        type="button"
-        onClick={() => {
-          const n = window.prompt("Explain the fundamental issue (notifies CEO + CTO):");
-          if (n !== null) void decide("disapprove", n);
-        }}
-        disabled={state === "saving"}
-        style={{ padding: "6px 14px", background: "#ef4444", color: "white", border: "none", borderRadius: 6, cursor: "pointer" }}
-      >
+      <button type="button" onClick={() => { const n = window.prompt("Explain the fundamental issue (notifies CEO + CTO):"); if (n !== null) void decide("disapprove", n); }} disabled={state === "saving"} style={{ padding: "6px 14px", background: "#ef4444", color: "white", border: "none", borderRadius: 6, cursor: "pointer" }}>
         ⌫ Disapprove
       </button>
       <span style={{ color: state === "error" ? "#ef4444" : "#10b981", fontSize: 13, marginLeft: 8, alignSelf: "center" }}>
@@ -341,19 +333,8 @@ function DecisionButtons({
   );
 }
 
-async function sendEmail({
-  companyId,
-  template,
-  to,
-}: {
-  companyId: string;
-  template: string;
-  to: string | null | undefined;
-}) {
-  if (!to) {
-    alert("No email on file for this company.");
-    return;
-  }
+async function sendEmail({ companyId, template, to }: { companyId: string; template: string; to: string | null | undefined }) {
+  if (!to) { alert("No email on file."); return; }
   if (!window.confirm(`Send "${template}" email to ${to}?`)) return;
   const sb = getFactorySupabase();
   await sb.from("outbound_emails").insert({
@@ -363,5 +344,5 @@ async function sendEmail({
     payload: {},
     status: "queued",
   });
-  alert(`Queued. Edge function emails/send will pick it up.`);
+  alert("Queued. Email service will pick it up.");
 }
