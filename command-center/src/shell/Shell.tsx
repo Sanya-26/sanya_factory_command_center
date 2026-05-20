@@ -1,6 +1,4 @@
-// Shell — outer chrome of the admin app.
-// Two departments (Cleo and AI Factory) live as labelled section groups in
-// the left sidebar. The active section's page renders in the main pane.
+// Shell — outer chrome of the admin app. Role-aware via Sidebar.
 
 import type { ReactNode } from "react";
 import { Sidebar } from "./Sidebar";
@@ -9,6 +7,7 @@ import { NotificationBell } from "../components/NotificationBell";
 
 export function Shell({
   email,
+  role,
   route,
   onNavigate,
   onSignOut,
@@ -16,6 +15,7 @@ export function Shell({
   children,
 }: {
   email: string;
+  role: string;
   route: Route;
   onNavigate: (r: Route) => void;
   onSignOut: () => void;
@@ -28,6 +28,7 @@ export function Shell({
         route={route}
         onNavigate={onNavigate}
         email={email}
+        role={role}
         onSignOut={onSignOut}
       />
       <div className="shell-main">

@@ -1,7 +1,8 @@
 // AUBOS Factory — admin shell entry point.
 //
-// Auth gate (Supabase session + ops_users) → Shell with two-department
-// sidebar nav. Each section renders its own page component.
+// Auth gate (Supabase session + ops_users) → role-aware Shell.
+// product_manager → Product view (docs/PRD-product-view.md).
+// All other roles → existing Cleo / AI Factory Tech view.
 
 import { useEffect, useState } from "react";
 import { getFactorySupabase } from "./lib/factorySupabase";
@@ -9,6 +10,7 @@ import { Shell } from "./shell/Shell";
 import {
   parseHash,
   navigate,
+  defaultRouteFor,
   type Route,
 } from "./shell/route";
 import { CleoCommandCenterPage } from "./pages/cleo-command-center";
@@ -26,6 +28,12 @@ import { FactorySettingsPage } from "./pages/factory/FactorySettings";
 import { ToolRegistryPage } from "./pages/factory/ToolRegistry";
 import { PipelineMapPage } from "./pages/PipelineMap";
 import { CalendarOAuthCallback } from "./pages/factory/CalendarOAuthCallback";
+import { ProductHomePage } from "./pages/product/ProductHome";
+import { ProductVariationPage } from "./pages/product/ProductVariation";
+import { ProductCustomerDetailPage } from "./pages/product/ProductCustomerDetail";
+import { ProductIssuesPage } from "./pages/product/ProductIssues";
+import { ProductSettingsPage } from "./pages/product/ProductSettings";
+import { ProductFlagsPage } from "./pages/product/ProductFlags";
 
 const OAUTH_CALLBACK_PATH = "/oauth/google-calendar/callback";
 
@@ -36,17 +44,11 @@ type Auth =
   | { status: "checking" }
   | { status: "anon" }
   | { status: "not-admin" }
-  | { status: "admin"; email: string };
+  | { status: "admin"; email: string; userId: string; role: string };
 
 export function App(): JSX.Element {
-  // §9 Group F — Google OAuth callback path. Google requires an HTTP
-  // path (not hash) for redirect_uri; this one URL is registered with
-  // the OAuth client. Short-circuit auth gate + Shell for this route
-  // since the component handles its own UX (success → /#factory/settings).
-  // The path check stays here (not before hooks) so we don't violate
-  // React's rules-of-hooks; the hooks below run no-op work then exit.
   const [auth, setAuth] = useState<Auth>({ status: "checking" });
-  const [route, setRoute] = useState<Route>(() => parseHash(window.location.hash));
+  const [route, setRoute] = useState<Route | null>(() => parseHash(window.location.hash));
   const isOAuthCallback = window.location.pathname.startsWith(OAUTH_CALLBACK_PATH);
 
   // Auth gate.
@@ -59,11 +61,7 @@ export function App(): JSX.Element {
         let { data: { session } } = await sb.auth.getSession();
         console.log("[auth-gate] initial session?", !!session?.user, session?.user?.email);
 
-        // Dev-only auto-signin. Gated by THREE conditions:
-        //   1. import.meta.env.DEV — Vite dev server only.
-        //   2. VITE_ENABLE_DEV_BYPASS === "1" — opt-in env var (never set in prod).
-        //   3. Runtime guard throws if somehow MODE === "production".
-        // Production builds set neither (1) nor (2) → this block is dead code.
+        // Dev-only auto-signin (unchanged).
         if (
           !session?.user &&
           import.meta.env.DEV &&
@@ -74,34 +72,32 @@ export function App(): JSX.Element {
           }
           const devEmail = import.meta.env.VITE_DEV_ADMIN_EMAIL as string | undefined;
           const devPw = import.meta.env.VITE_DEV_ADMIN_PASSWORD as string | undefined;
-          console.log("[auth-gate] dev creds present?", !!(devEmail && devPw));
           if (devEmail && devPw) {
-            console.log("[auth-gate] dev signInWithPassword...");
             const { error } = await sb.auth.signInWithPassword({ email: devEmail, password: devPw });
-            console.log("[auth-gate] dev signIn done; error?", error?.message);
             if (cancelled) return;
             if (!error) {
-              // In dev, we KNOW this user is an ops_user (it's our hardcoded
-              // admin), so short-circuit to avoid the from('ops_users') query
-              // hanging on Supabase's auth lock right after a sign-in.
-              setAuth({ status: "admin", email: devEmail });
-              return;
+              // Re-fetch session to get the user id.
+              const { data: { session: s2 } } = await sb.auth.getSession();
+              session = s2;
             }
           }
         }
 
         if (cancelled) return;
         if (!session?.user) { setAuth({ status: "anon" }); return; }
-        console.log("[auth-gate] checking ops_users for", session.user.id);
         const { data: ops } = await sb
           .from("ops_users")
-          .select("user_id")
+          .select("user_id, role")
           .eq("user_id", session.user.id)
           .maybeSingle();
-        console.log("[auth-gate] ops row?", !!ops);
         if (cancelled) return;
         if (!ops) { setAuth({ status: "not-admin" }); return; }
-        setAuth({ status: "admin", email: session.user.email ?? "" });
+        setAuth({
+          status: "admin",
+          email: session.user.email ?? "",
+          userId: session.user.id,
+          role: (ops as { role?: string }).role ?? "viewer",
+        });
       } catch (e) {
         console.error("[auth-gate] error", e);
         if (!cancelled) setAuth({ status: "anon" });
@@ -109,6 +105,15 @@ export function App(): JSX.Element {
     })();
     return () => { cancelled = true; };
   }, []);
+
+  // Default landing once role is known.
+  useEffect(() => {
+    if (auth.status !== "admin") return;
+    if (route) return;
+    const r = defaultRouteFor(auth.role);
+    navigate(r);
+    setRoute(r);
+  }, [auth, route]);
 
   // Hash routing.
   useEffect(() => {
@@ -138,22 +143,43 @@ export function App(): JSX.Element {
     window.location.href = `${AUTH_PORTAL_URL}/login`;
   };
 
-  const trail = buildTrail(route);
+  const currentRoute = route ?? defaultRouteFor(auth.role);
+  const trail = buildTrail(currentRoute);
 
   return (
     <Shell
       email={auth.email}
-      route={route}
+      role={auth.role}
+      route={currentRoute}
       onNavigate={(r) => navigate(r)}
       onSignOut={() => void handleSignOut()}
       trail={trail}
     >
-      <PageRouter route={route} />
+      <PageRouter route={currentRoute} role={auth.role} userId={auth.userId} />
     </Shell>
   );
 }
 
-function PageRouter({ route }: { route: Route }): JSX.Element {
+function PageRouter({
+  route,
+  role,
+  userId,
+}: {
+  route: Route;
+  role: string;
+  userId: string;
+}): JSX.Element {
+  if (route.dept === "product") {
+    if (route.section === "home") return <ProductHomePage />;
+    if (route.section === "issues") return <ProductIssuesPage userId={userId} />;
+    if (route.section === "settings") return <ProductSettingsPage userRole={role} />;
+    // /product/<niche>[/customer/<id>] or /product/<niche>/flags
+    const niche = route.section;
+    if (route.id === "customer" && route.sub)
+      return <ProductCustomerDetailPage niche={niche} companyId={route.sub} userId={userId} />;
+    if (route.id === "flags") return <ProductFlagsPage niche={niche} />;
+    return <ProductVariationPage niche={niche} />;
+  }
   if (route.dept === "cleo") {
     if (route.section === "command-center") return <CleoCommandCenterPage route={route} />;
     if (route.section === "workflow") return <PipelineMapPage dept="cleo" />;
@@ -170,8 +196,6 @@ function PageRouter({ route }: { route: Route }): JSX.Element {
     if (route.section === "tool-registry") return <ToolRegistryPage route={route} />;
     if (route.section === "build-agents") return <BuildAgentsPage route={route} />;
     if (route.section === "tenants") {
-      // /factory/tenants            → list (existing)
-      // /factory/tenants/<slug>     → admin panel (new)
       if (route.id) return <TenantAdminPanel tenantSlug={route.id} />;
       return <TenantsPage />;
     }
@@ -186,6 +210,23 @@ function PageRouter({ route }: { route: Route }): JSX.Element {
 }
 
 function buildTrail(r: Route): Array<{ label: string; onClick?: () => void }> {
+  if (r.dept === "product") {
+    const trail: Array<{ label: string; onClick?: () => void }> = [{ label: "Product" }];
+    if (r.section === "home") return trail;
+    if (r.section === "issues") return [...trail, { label: "Issues" }];
+    if (r.section === "settings") return [...trail, { label: "Settings" }];
+    const niche = r.section;
+    trail.push({
+      label: nicheTitle(niche),
+      onClick: r.id ? () => navigate({ dept: "product", section: niche }) : undefined,
+    });
+    if (r.id === "customer" && r.sub) {
+      trail.push({ label: r.sub.slice(0, 8) + "…" });
+    } else if (r.id === "flags") {
+      trail.push({ label: "Flags" });
+    }
+    return trail;
+  }
   const dept = r.dept === "cleo" ? "Cleo" : "AI Factory";
   const section: Record<string, string> = {
     "command-center": "Command Center",
@@ -208,10 +249,15 @@ function buildTrail(r: Route): Array<{ label: string; onClick?: () => void }> {
     },
   ];
   if (r.id) {
-    // For niche-library, slug is the id and is human-readable. For customers,
-    // it's a uuid — abbreviate.
     const looksLikeUuid = /^[0-9a-f-]{8,}$/i.test(r.id) && r.id.includes("-");
     trail.push({ label: looksLikeUuid ? r.id.slice(0, 8) + "…" : r.id });
   }
   return trail;
+}
+
+function nicheTitle(slug: string): string {
+  return slug
+    .split("-")
+    .map((s) => s[0]?.toUpperCase() + s.slice(1))
+    .join(" ");
 }

@@ -1,4 +1,7 @@
-// Sidebar — brand + two-department nav + admin footer.
+// Sidebar — brand + role-aware department nav + admin footer.
+//
+// role=product_manager → Product sidebar (variations + Issues + Settings)
+// other roles          → existing Cleo + AI Factory sidebar
 
 import type { Route } from "./route";
 import { navigate } from "./route";
@@ -6,15 +9,17 @@ import { navigate } from "./route";
 interface SectionDef {
   id: string;
   label: string;
+  // If true, dept+section+id must all match for the active highlight.
+  exactId?: string;
 }
 interface DeptDef {
-  id: "cleo" | "factory";
+  id: "cleo" | "factory" | "product";
   label: string;
   glyph: string;
   sections: SectionDef[];
 }
 
-const DEPARTMENTS: DeptDef[] = [
+const TECH_DEPARTMENTS: DeptDef[] = [
   {
     id: "cleo",
     label: "Cleo",
@@ -43,28 +48,48 @@ const DEPARTMENTS: DeptDef[] = [
   },
 ];
 
+const PRODUCT_DEPARTMENTS: DeptDef[] = [
+  {
+    id: "product",
+    label: "Product",
+    glyph: "◆",
+    sections: [
+      { id: "home", label: "Main dashboard" },
+      { id: "cleo-for-pools", label: "· Cleo for Pools" },
+      { id: "gameday-model", label: "· Gameday Model" },
+      { id: "real-estate-model", label: "· Real Estate Model" },
+      { id: "issues", label: "Issues" },
+      { id: "settings", label: "Settings" },
+    ],
+  },
+];
+
 export function Sidebar({
   route,
   email,
+  role,
   onSignOut,
 }: {
   route: Route;
   onNavigate: (r: Route) => void;
   email: string;
+  role: string;
   onSignOut: () => void;
 }): JSX.Element {
+  const departments =
+    role === "product_manager" ? PRODUCT_DEPARTMENTS : TECH_DEPARTMENTS;
   return (
     <aside className="shell-sidebar">
       <div className="shell-sidebar-brand">
         <div className="shell-sidebar-brand-mark">A</div>
         <div className="shell-sidebar-brand-text">
           <strong>AUBOS</strong>
-          <span>Factory</span>
+          <span>{role === "product_manager" ? "Product" : "Factory"}</span>
         </div>
       </div>
 
       <nav className="shell-sidebar-nav">
-        {DEPARTMENTS.map((d) => (
+        {departments.map((d) => (
           <div key={d.id} className="shell-sidebar-dept">
             <div className="shell-sidebar-dept-label">
               <span className="shell-sidebar-dept-glyph">{d.glyph}</span>
@@ -90,6 +115,7 @@ export function Sidebar({
 
       <div className="shell-sidebar-footer">
         <span className="shell-sidebar-email" title={email}>{email}</span>
+        <span className="shell-sidebar-role-tag">{role}</span>
         <button type="button" className="shell-sidebar-signout" onClick={onSignOut}>
           ⏻ sign out
         </button>

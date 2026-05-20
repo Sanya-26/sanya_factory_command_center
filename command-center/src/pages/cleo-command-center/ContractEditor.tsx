@@ -122,13 +122,32 @@ export function ContractEditor({
     const patch: Partial<ContractRow> = { status };
     if (status === "approved") patch.reviewed_at = new Date().toISOString();
     if (status === "sent") patch.sent_at = new Date().toISOString();
-    const { error: err } = await getFactorySupabase()
+    const sb = getFactorySupabase();
+    const { error: err } = await sb
       .from("contract_drafts")
       .update(patch)
       .eq("id", contract.id);
     if (err) {
       setError(err.message);
       return;
+    }
+    // When sending, queue an outbound email (PRD §8). emails-send edge fn drains.
+    if (status === "sent") {
+      const { data: c } = await sb.from("companies").select("email, name").eq("id", contract.company_id).maybeSingle();
+      const recipient = (c as { email?: string | null } | null)?.email;
+      if (recipient) {
+        await sb.from("outbound_emails").insert({
+          company_id: contract.company_id,
+          recipient_email: recipient,
+          template: "contract_send",
+          payload: {
+            contract_id: contract.id,
+            contract_url: contract.signature_url ?? "",
+            company_name: (c as { name?: string } | null)?.name ?? "",
+          },
+          status: "queued",
+        });
+      }
     }
     setContract({ ...contract, ...patch } as ContractRow);
   };
