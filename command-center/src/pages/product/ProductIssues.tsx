@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getFactorySupabase } from "../../lib/factorySupabase";
 import { StatusDonut } from "../../components/charts/StatusDonut";
 import { Modal } from "../../components/Modal";
+import { selectStyle } from "../../lib/ui-styles";
 
 interface IssueWithStats {
   id: string;
@@ -133,7 +134,7 @@ export function ProductIssuesPage({ userId }: { userId: string }): JSX.Element {
     <div style={{ padding: 24, display: "grid", gap: 16 }}>
       <header style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
         <h1 style={{ margin: 0 }}>Issues</h1>
-        <select value={filter} onChange={(e) => setFilter(e.target.value as "open" | "all")}>
+        <select value={filter} onChange={(e) => setFilter(e.target.value as "open" | "all")} style={selectStyle}>
           <option value="open">Open only</option>
           <option value="all">All</option>
         </select>
@@ -144,7 +145,7 @@ export function ProductIssuesPage({ userId }: { userId: string }): JSX.Element {
           onChange={(e) => setSearch(e.target.value)}
           style={{ padding: "6px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13 }}
         />
-        <select value={assigneeFilter} onChange={(e) => setAssigneeFilter(e.target.value)} style={{ padding: "6px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13 }}>
+        <select value={assigneeFilter} onChange={(e) => setAssigneeFilter(e.target.value)} style={{ ...selectStyle, padding: "6px 10px", fontSize: 13 }}>
           <option value="">All assignees</option>
           {assignableOps.map((o) => (
             <option key={o.user_id} value={o.user_id}>{o.user_id.slice(0, 8)}…</option>
@@ -180,17 +181,17 @@ export function ProductIssuesPage({ userId }: { userId: string }): JSX.Element {
           <textarea placeholder="Description (optional)" value={newIssue.description} onChange={(e) => setNewIssue({ ...newIssue, description: e.target.value })} rows={3} style={{ padding: 8 }} />
           <div style={{ display: "flex", gap: 8 }}>
             <label>Severity:{" "}
-              <select value={newIssue.severity} onChange={(e) => setNewIssue({ ...newIssue, severity: e.target.value })}>
+              <select value={newIssue.severity} onChange={(e) => setNewIssue({ ...newIssue, severity: e.target.value })} style={selectStyle}>
                 <option value="low">low</option><option value="medium">medium</option><option value="high">high</option><option value="critical">critical</option>
               </select>
             </label>
             <label>Priority:{" "}
-              <select value={newIssue.priority} onChange={(e) => setNewIssue({ ...newIssue, priority: e.target.value })}>
+              <select value={newIssue.priority} onChange={(e) => setNewIssue({ ...newIssue, priority: e.target.value })} style={selectStyle}>
                 <option value="normal">normal</option><option value="high">high</option><option value="urgent">urgent</option>
               </select>
             </label>
             <label>Assignee:{" "}
-              <select value={newIssue.assignee_id} onChange={(e) => setNewIssue({ ...newIssue, assignee_id: e.target.value })}>
+              <select value={newIssue.assignee_id} onChange={(e) => setNewIssue({ ...newIssue, assignee_id: e.target.value })} style={selectStyle}>
                 <option value="">— unassigned —</option>
                 {assignableOps.map((o) => <option key={o.user_id} value={o.user_id}>{o.role}: {o.user_id.slice(0, 8)}…</option>)}
               </select>
@@ -247,7 +248,7 @@ export function ProductIssuesPage({ userId }: { userId: string }): JSX.Element {
                 </span>
               </td>
               <td style={{ padding: 10 }} onClick={(e) => e.stopPropagation()}>
-                <select value={i.status} onChange={(e) => void setStatus(i.id, e.target.value)}>
+                <select value={i.status} onChange={(e) => void setStatus(i.id, e.target.value)} style={selectStyle}>
                   <option value="open">open</option>
                   <option value="in_progress">in_progress</option>
                   <option value="blocked">blocked</option>
@@ -256,7 +257,7 @@ export function ProductIssuesPage({ userId }: { userId: string }): JSX.Element {
                 </select>
               </td>
               <td style={{ padding: 10 }} onClick={(e) => e.stopPropagation()}>
-                <select value={i.assignee_id ?? ""} onChange={(e) => void setAssignee(i.id, e.target.value || null)} style={{ fontSize: 12 }}>
+                <select value={i.assignee_id ?? ""} onChange={(e) => void setAssignee(i.id, e.target.value || null)} style={selectStyle}>
                   <option value="">— unassigned —</option>
                   {assignableOps.map((o) => <option key={o.user_id} value={o.user_id}>{o.role}: {o.user_id.slice(0, 8)}…</option>)}
                 </select>

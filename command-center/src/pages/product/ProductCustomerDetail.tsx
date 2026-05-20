@@ -10,6 +10,7 @@ import { StageStepper } from "../../components/charts/StageStepper";
 import { ActivityTimeline } from "../../components/charts/ActivityTimeline";
 import { MapPopup, SynopsisPopup, ProposalPopup } from "../../components/product-popups";
 import { ScheduleCallPopup } from "../../components/schedule-call-popup";
+import { selectStyle } from "../../lib/ui-styles";
 
 interface Company {
   id: string;
@@ -389,6 +390,7 @@ function Checklist({
                 <select
                   value={it.status ?? "pending"}
                   onChange={(e) => update(i, { status: e.target.value as ChecklistItem["status"] })}
+                  style={selectStyle}
                 >
                   <option value="pending">pending</option>
                   <option value="pass">pass</option>

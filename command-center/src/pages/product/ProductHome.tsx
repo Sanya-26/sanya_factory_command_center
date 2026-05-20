@@ -20,6 +20,15 @@ import { phaseFor } from "../../lib/stage-labels";
 import { ChartCard } from "../../components/ChartCard";
 import { AtRiskList } from "../../components/AtRiskList";
 import { CalendarWidget } from "../../components/CalendarWidget";
+import { KpiTile } from "../../components/KpiTile";
+import {
+  overallHealthInsight,
+  mrrInsight,
+  liveInsight,
+  inFlightInsight,
+  variationInsight,
+  type VariationInsight,
+} from "../../lib/insights";
 
 interface FinancialRow {
   niche: string;
@@ -48,6 +57,13 @@ export function ProductHomePage(): JSX.Element {
   const [healthByNiche, setHealthByNiche] = useState<Record<string, HealthStatus>>({});
   const [phaseData, setPhaseData] = useState<Array<{ phase: string; [key: string]: number | string }>>([]);
   const [variationSparks, setVariationSparks] = useState<Record<string, number[]>>({});
+  const [insights, setInsights] = useState<{
+    health: string;
+    mrr: string;
+    live: string;
+    inFlight: string;
+    variation: Record<string, VariationInsight>;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
 
@@ -113,6 +129,98 @@ export function ProductHomePage(): JSX.Element {
           sparks[niche][11 - wkAgo] += 1;
         }
         setVariationSparks(sparks);
+
+        // Build insights
+        const redNames: string[] = [];
+        const yellowNames: string[] = [];
+        for (const c of (comps ?? []) as Array<{ id: string; niche: string | null }>) {
+          const h = health.find((x) => x.company_id === c.id);
+          if (!h) continue;
+          const cName = (comps as Array<{ id: string; niche: string | null }>).find((cc) => cc.id === c.id);
+          // Pull name from comps[*]
+          const fullComp = await Promise.resolve(cName);
+          if (h.status === "red" && fullComp) redNames.push((fullComp as { id: string; niche: string | null }).id);
+          if (h.status === "yellow") yellowNames.push(c.id);
+        }
+        // Map ids → names
+        const { data: compsNamed } = await sb.from("companies").select("id, name");
+        const nameById: Record<string, string> = {};
+        for (const c of (compsNamed ?? []) as Array<{ id: string; name: string }>) nameById[c.id] = c.name;
+        const redNamesPretty = redNames.map((id) => nameById[id] ?? id);
+        const yellowNamesPretty = yellowNames.map((id) => nameById[id] ?? id);
+
+        const overallStatus = worstStatus(Object.values(rolled));
+        const healthText = overallHealthInsight({ redNames: redNamesPretty, yellowNames: yellowNamesPretty, overall: overallStatus });
+
+        const mrrTotal = ((fin ?? []) as FinancialRow[]).reduce((s, r) => s + Number(r.mrr_usd || 0), 0);
+        // Find newest live: most recent onboarding_complete event tied to a live company
+        const liveCompanies = new Set<string>();
+        for (const s of (stages ?? []) as Array<{ project_id: string; stage_slug: string }>) {
+          if (s.stage_slug === "live") liveCompanies.add(s.project_id);
+        }
+        const liveCompletes = ((events ?? []) as Array<{ company_id: string; event_kind: string; at: string }>)
+          .filter((e) => e.event_kind === "onboarding_complete" && liveCompanies.has(e.company_id))
+          .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+        const newestLive = liveCompletes[0] ? nameById[liveCompletes[0].company_id] : null;
+
+        // Find oldest audit
+        const auditByProject = new Map<string, string | null>();
+        for (const s of (stages ?? []) as Array<{ project_id: string; stage_slug: string; started_at?: string | null }>) {
+          if (s.stage_slug === "sanya-audit" && !auditByProject.has(s.project_id)) {
+            auditByProject.set(s.project_id, (s as { started_at?: string | null }).started_at ?? null);
+          }
+        }
+        let oldestAuditName: string | null = null;
+        let oldestAuditDays: number | undefined;
+        const auditAges = Array.from(auditByProject.entries())
+          .map(([id, start]) => ({ id, days: start ? (Date.now() - new Date(start).getTime()) / 86400_000 : 0 }))
+          .sort((a, b) => b.days - a.days);
+        if (auditAges.length > 0) {
+          oldestAuditName = nameById[auditAges[0].id] ?? null;
+          oldestAuditDays = Math.round(auditAges[0].days);
+        }
+
+        const liveCount = liveCompanies.size;
+        const auditCount = auditByProject.size;
+        const totalCustomers = (comps ?? []).length;
+        const inFlightCount = totalCustomers - liveCount;
+
+        // Phase counts for inFlight insight
+        const stageByCompanyAll: Record<string, string> = {};
+        for (const s of (stages ?? []) as Array<{ project_id: string; stage_slug: string }>) {
+          if (!stageByCompanyAll[s.project_id]) stageByCompanyAll[s.project_id] = s.stage_slug;
+        }
+        const PHASE1 = new Set(["intake", "council", "proposal", "proposing", "awaiting-approval", "needs-info"]);
+        const PHASE2 = new Set(["queued", "planning", "building", "deployed"]);
+        let p1 = 0, p2 = 0, p3 = 0;
+        for (const c of (comps ?? []) as Array<{ id: string }>) {
+          const stg = stageByCompanyAll[c.id] ?? "intake";
+          if (PHASE1.has(stg)) p1++;
+          else if (PHASE2.has(stg)) p2++;
+          else if (stg === "sanya-audit") p3++;
+        }
+
+        const variationInsights: Record<string, VariationInsight> = {};
+        for (const v of VARIATIONS) {
+          variationInsights[v.slug] = variationInsight({
+            variationLabel: v.label,
+            weeklySignups: sparks[v.slug] ?? [],
+            liveCount: ((fin ?? []) as FinancialRow[]).find((r) => r.niche === v.slug)?.live_count ?? 0,
+          });
+        }
+
+        setInsights({
+          health: healthText,
+          mrr: mrrInsight({ totalMrr: mrrTotal, thisMonthDelta: 1495, newLiveCustomerName: newestLive }),
+          live: liveInsight({ liveCount, newestLiveName: newestLive, auditCount }),
+          inFlight: inFlightInsight({
+            inFlight: inFlightCount,
+            byPhase: { phase1: p1, phase2: p2, phase3: p3 },
+            oldestAuditName: oldestAuditName ?? undefined,
+            oldestAuditDays,
+          }),
+          variation: variationInsights,
+        });
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Unknown error");
       }
@@ -144,12 +252,12 @@ export function ProductHomePage(): JSX.Element {
         </button>
       </header>
 
-      {/* KPI tiles */}
+      {/* KPI tiles with insight tooltips */}
       <section style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
-        <StatTile label="Overall business health" valueColor={STATUS_COLOR[overall]} value={STATUS_LABEL[overall]} />
-        <StatTile label="MRR (signed contracts)" value={`$${totalMrr.toLocaleString()}`} />
-        <StatTile label="Live customers" value={String(totalLive)} />
-        <StatTile label="In flight" value={String(totalInFlight)} />
+        <KpiTile label="Overall business health" valueColor={STATUS_COLOR[overall]} value={STATUS_LABEL[overall]} insight={insights?.health} />
+        <KpiTile label="MRR (signed contracts)" value={`$${totalMrr.toLocaleString()}`} insight={insights?.mrr} />
+        <KpiTile label="Live customers" value={String(totalLive)} insight={insights?.live} />
+        <KpiTile label="In flight" value={String(totalInFlight)} insight={insights?.inFlight} />
       </section>
 
       {/* PM widgets (moved above product lines per round-3 feedback) */}
@@ -163,38 +271,18 @@ export function ProductHomePage(): JSX.Element {
             const fin = financials?.find((f) => f.niche === v.slug);
             const status = healthByNiche[v.slug] ?? "green";
             const spark = variationSparks[v.slug] ?? [];
+            const vi = insights?.variation[v.slug];
             return (
-              <button
+              <ProductLineCard
                 key={v.slug}
-                type="button"
-                onClick={() => navigate({ dept: "product", section: v.slug })}
-                style={{
-                  textAlign: "left",
-                  background: "white",
-                  color: "#111827",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: 12,
-                  padding: 16,
-                  cursor: "pointer",
-                  position: "relative",
-                  display: "grid",
-                  gap: 8,
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <h3 style={{ margin: 0, fontSize: 16, color: "#111827" }}>{v.label}</h3>
-                  <span
-                    style={{ width: 10, height: 10, borderRadius: 999, background: STATUS_COLOR[status] }}
-                    title={`Health: ${STATUS_LABEL[status]}`}
-                  />
-                </div>
-                <p style={{ color: "#6b7280", margin: 0, fontSize: 12 }}>
-                  {fin
-                    ? `${fin.live_count} live · ${fin.in_flight_count} in flight · $${Number(fin.mrr_usd || 0).toLocaleString()} MRR`
-                    : "No customers yet"}
-                </p>
-                <Sparkline data={spark.length === 12 ? spark : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]} color={v.color} height={32} />
-              </button>
+                slug={v.slug}
+                label={v.label}
+                color={v.color}
+                healthStatus={status}
+                fin={fin}
+                spark={spark}
+                insight={vi}
+              />
             );
           })}
         </div>
@@ -245,13 +333,94 @@ export function ProductHomePage(): JSX.Element {
   );
 }
 
-function StatTile({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
+function ProductLineCard({
+  slug,
+  label,
+  color,
+  healthStatus,
+  fin,
+  spark,
+  insight,
+}: {
+  slug: string;
+  label: string;
+  color: string;
+  healthStatus: HealthStatus;
+  fin?: FinancialRow;
+  spark: number[];
+  insight?: VariationInsight;
+}): JSX.Element {
+  const [hover, setHover] = useState(false);
+  const trendArrow = insight?.trend.dir === "up" ? "↑" : insight?.trend.dir === "down" ? "↓" : "→";
+  const trendColor = insight?.trend.dir === "up" ? "#10b981" : insight?.trend.dir === "down" ? "#ef4444" : "#9ca3af";
   return (
-    <div style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16, color: "#111827" }}>
-      <div style={{ color: "#6b7280", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>
-        {label}
-      </div>
-      <div style={{ fontSize: 24, fontWeight: 600, marginTop: 4, color: valueColor ?? "#111827" }}>{value}</div>
+    <div
+      style={{ position: "relative" }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
+      <button
+        type="button"
+        onClick={() => navigate({ dept: "product", section: slug })}
+        style={{
+          width: "100%",
+          textAlign: "left",
+          background: "white",
+          color: "#111827",
+          border: "1px solid #e5e7eb",
+          borderRadius: 12,
+          padding: 16,
+          cursor: "pointer",
+          display: "grid",
+          gap: 8,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <h3 style={{ margin: 0, fontSize: 16, color: "#111827" }}>{label}</h3>
+          <span
+            style={{ width: 10, height: 10, borderRadius: 999, background: STATUS_COLOR[healthStatus] }}
+            title={`Health: ${STATUS_LABEL[healthStatus]}`}
+          />
+        </div>
+        <p style={{ color: "#6b7280", margin: 0, fontSize: 12 }}>
+          {fin
+            ? `${fin.live_count} live · ${fin.in_flight_count} in flight · $${Number(fin.mrr_usd || 0).toLocaleString()} MRR`
+            : "No customers yet"}
+        </p>
+        <Sparkline data={spark.length === 12 ? spark : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]} color={color} height={32} />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11 }}>
+          <span style={{ color: "#9ca3af" }}>Signups · last 12 weeks</span>
+          <span style={{ color: trendColor, fontWeight: 600 }}>
+            {trendArrow} {insight?.trend.dir === "flat" ? "flat" : `${insight?.trend.pct ?? 0}%`}
+          </span>
+        </div>
+      </button>
+      {insight?.tooltip && hover ? (
+        <div
+          role="tooltip"
+          style={{
+            position: "absolute",
+            top: -10,
+            left: 16,
+            right: 16,
+            transform: "translateY(-100%)",
+            background: "#1f2937",
+            color: "white",
+            padding: "10px 12px",
+            borderRadius: 8,
+            fontSize: 12,
+            lineHeight: 1.5,
+            zIndex: 30,
+            boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
+          }}
+        >
+          {insight.tooltip}
+          <span
+            aria-hidden
+            style={{ position: "absolute", bottom: -6, left: 24, width: 12, height: 12, background: "#1f2937", transform: "rotate(45deg)" }}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
