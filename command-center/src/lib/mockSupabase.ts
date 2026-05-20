@@ -123,9 +123,34 @@ function computeFinancialSummary(): Row[] {
   }));
 }
 
+function computeIssuesWithFlagStats(): Row[] {
+  // Per tech_issue, count linked open flags + distinct customers.
+  const flagsByIssue = new Map<string, { count: number; companies: Set<string> }>();
+  for (const f of DB.customer_flags || []) {
+    const link = f.linked_issue_id as string | null | undefined;
+    if (!link || f.status === "resolved") continue;
+    if (!flagsByIssue.has(link)) flagsByIssue.set(link, { count: 0, companies: new Set() });
+    const b = flagsByIssue.get(link)!;
+    b.count += 1;
+    if (f.company_id) b.companies.add(String(f.company_id));
+  }
+  return (DB.tech_issues || []).map((ti) => {
+    const stats = flagsByIssue.get(String(ti.id));
+    const flag_count = stats?.count ?? 0;
+    const customer_count = stats?.companies.size ?? 0;
+    return {
+      ...ti,
+      flag_count,
+      customer_count,
+      priority_score: flag_count + customer_count * 2,
+    };
+  });
+}
+
 function getTableRows(table: string): Row[] {
   if (table === "v_account_health") return computeAccountHealth();
   if (table === "v_financial_summary") return computeFinancialSummary();
+  if (table === "v_issues_with_flag_stats") return computeIssuesWithFlagStats();
   return DB[table] ?? (DB[table] = []);
 }
 

@@ -16,7 +16,9 @@ interface Flag {
   body: string | null;
   status: string;
   resolved_at: string | null;
+  linked_issue_id: string | null;
   company_name?: string;
+  issue_title?: string;
 }
 
 const SEV_COLOR: Record<string, string> = {
@@ -45,8 +47,15 @@ export function ProductFlagsPage({ niche }: { niche: string }): JSX.Element {
           .in("company_id", companyIds)
           .order("reported_at", { ascending: false });
         if (err) throw err;
+        const { data: tis } = await sb.from("tech_issues").select("id, title");
+        const issueById: Record<string, string> = {};
+        for (const t of ((tis ?? []) as Array<{ id: string; title: string }>)) issueById[t.id] = t.title;
         if (cancelled) return;
-        setFlags(((data ?? []) as Flag[]).map((f) => ({ ...f, company_name: nameById[f.company_id] ?? f.company_id })));
+        setFlags(((data ?? []) as Flag[]).map((f) => ({
+          ...f,
+          company_name: nameById[f.company_id] ?? f.company_id,
+          issue_title: f.linked_issue_id ? issueById[f.linked_issue_id] : undefined,
+        })));
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Unknown error");
       }
@@ -131,6 +140,7 @@ export function ProductFlagsPage({ niche }: { niche: string }): JSX.Element {
             <th style={{ padding: 10 }}>Severity</th>
             <th style={{ padding: 10 }}>Source</th>
             <th style={{ padding: 10 }}>Title</th>
+            <th style={{ padding: 10 }}>Linked issue</th>
             <th style={{ padding: 10 }}>Status</th>
             <th style={{ padding: 10 }}></th>
           </tr>
@@ -151,6 +161,15 @@ export function ProductFlagsPage({ niche }: { niche: string }): JSX.Element {
               </td>
               <td style={{ padding: 10 }}>{f.source}</td>
               <td style={{ padding: 10 }}>{f.title}</td>
+              <td style={{ padding: 10, fontSize: 12 }}>
+                {f.issue_title ? (
+                  <button type="button" onClick={() => navigate({ dept: "product", section: "issues" })} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", padding: 0, fontSize: 12, textAlign: "left" }}>
+                    {f.issue_title}
+                  </button>
+                ) : (
+                  <span style={{ color: "#9ca3af" }}>— untriaged —</span>
+                )}
+              </td>
               <td style={{ padding: 10 }}>{f.status}</td>
               <td style={{ padding: 10 }}>
                 {f.status === "open" ? (
@@ -160,7 +179,7 @@ export function ProductFlagsPage({ niche }: { niche: string }): JSX.Element {
             </tr>
           ))}
           {filtered.length === 0 ? (
-            <tr><td colSpan={7} style={{ padding: 20, textAlign: "center", color: "#9ca3af" }}>
+            <tr><td colSpan={8} style={{ padding: 20, textAlign: "center", color: "#9ca3af" }}>
               {flags === null ? "Loading…" : "No flags."}
             </td></tr>
           ) : null}

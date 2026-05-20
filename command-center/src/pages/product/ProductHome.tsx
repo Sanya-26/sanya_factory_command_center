@@ -178,9 +178,9 @@ export function ProductHomePage(): JSX.Element {
         )}
       </section>
 
-      {/* Variation cards */}
+      {/* Product lines */}
       <section>
-        <h2 style={{ marginBottom: 12, fontSize: 16 }}>Product variations</h2>
+        <h2 style={{ marginBottom: 12, fontSize: 16 }}>Product lines</h2>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
           {VARIATIONS.map((v) => {
             const fin = financials?.find((f) => f.niche === v.slug);
@@ -194,6 +194,7 @@ export function ProductHomePage(): JSX.Element {
                 style={{
                   textAlign: "left",
                   background: "white",
+                  color: "#111827",
                   border: "1px solid #e5e7eb",
                   borderRadius: 12,
                   padding: 16,
@@ -204,7 +205,7 @@ export function ProductHomePage(): JSX.Element {
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <h3 style={{ margin: 0, fontSize: 15 }}>{v.label}</h3>
+                  <h3 style={{ margin: 0, fontSize: 16, color: "#111827" }}>{v.label}</h3>
                   <span
                     style={{ width: 10, height: 10, borderRadius: 999, background: STATUS_COLOR[status] }}
                     title={`Health: ${STATUS_LABEL[status]}`}
@@ -221,6 +222,9 @@ export function ProductHomePage(): JSX.Element {
           })}
         </div>
       </section>
+
+      {/* PM widgets */}
+      <PmWidgets />
 
       {/* Financial table */}
       <section>
@@ -259,11 +263,11 @@ export function ProductHomePage(): JSX.Element {
 
 function StatTile({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
   return (
-    <div style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
+    <div style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16, color: "#111827" }}>
       <div style={{ color: "#6b7280", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>
         {label}
       </div>
-      <div style={{ fontSize: 24, fontWeight: 600, marginTop: 4, color: valueColor }}>{value}</div>
+      <div style={{ fontSize: 24, fontWeight: 600, marginTop: 4, color: valueColor ?? "#111827" }}>{value}</div>
     </div>
   );
 }
@@ -271,4 +275,136 @@ function StatTile({ label, value, valueColor }: { label: string; value: string; 
 function nicheLabel(slug: string): string {
   const v = VARIATIONS.find((x) => x.slug === slug);
   return v?.label ?? slug;
+}
+
+// ─── PM widgets ─────────────────────────────────────────────────────────────
+interface AuditQueueRow { id: string; name: string; niche: string; days: number }
+interface TopIssue { id: string; title: string; flag_count: number; customer_count: number; priority_score: number }
+
+function PmWidgets(): JSX.Element {
+  const [audit, setAudit] = useState<AuditQueueRow[]>([]);
+  const [topIssues, setTopIssues] = useState<TopIssue[]>([]);
+  const [ttl, setTtl] = useState<Array<{ niche: string; days: number }>>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const sb = getFactorySupabase();
+      // Audit queue: companies whose latest stage_run is 'sanya-audit'
+      const { data: stages } = await sb
+        .from("project_lifecycle_stage_runs")
+        .select("project_id, stage_slug, started_at, updated_at")
+        .order("updated_at", { ascending: false });
+      const latest = new Map<string, { stage_slug: string; started_at: string | null }>();
+      for (const s of (stages ?? []) as Array<{ project_id: string; stage_slug: string; started_at: string | null }>) {
+        if (!latest.has(s.project_id)) latest.set(s.project_id, s);
+      }
+      const auditIds = Array.from(latest.entries()).filter(([, v]) => v.stage_slug === "sanya-audit").map(([id]) => id);
+      const { data: comps } = await sb.from("companies").select("id, name, niche").in("id", auditIds);
+      const queue: AuditQueueRow[] = ((comps ?? []) as Array<{ id: string; name: string; niche: string }>).map((c) => {
+        const start = latest.get(c.id)?.started_at;
+        const days = start ? Math.max(0, Math.round((Date.now() - new Date(start).getTime()) / 86400_000)) : 0;
+        return { id: c.id, name: c.name, niche: c.niche, days };
+      }).sort((a, b) => b.days - a.days);
+      if (!cancelled) setAudit(queue);
+
+      // Top issues: priority desc
+      const { data: issues } = await sb.from("v_issues_with_flag_stats").select("id, title, flag_count, customer_count, priority_score, status").order("priority_score", { ascending: false }).limit(5);
+      if (!cancelled) setTopIssues(((issues ?? []) as Array<TopIssue & { status: string }>).filter((i) => !["done", "wontfix"].includes((i as { status: string }).status)).slice(0, 5));
+
+      // Avg time to live: pair signup → live (or onboarding_complete fallback) per niche.
+      const { data: evs } = await sb.from("client_journey_events").select("company_id, event_kind, at");
+      const { data: compAll } = await sb.from("companies").select("id, niche");
+      const nicheById: Record<string, string> = {};
+      for (const c of (compAll ?? []) as Array<{ id: string; niche: string }>) nicheById[c.id] = c.niche;
+      const signups: Record<string, string> = {};
+      const lives: Record<string, string> = {};
+      for (const e of (evs ?? []) as Array<{ company_id: string; event_kind: string; at: string }>) {
+        if (e.event_kind === "signup" && !signups[e.company_id]) signups[e.company_id] = e.at;
+        if ((e.event_kind === "onboarding_complete" || e.event_kind === "live_announced") && !lives[e.company_id]) lives[e.company_id] = e.at;
+      }
+      const byNiche = new Map<string, { sum: number; n: number }>();
+      for (const [cid, signupAt] of Object.entries(signups)) {
+        const liveAt = lives[cid];
+        if (!liveAt) continue;
+        const days = (new Date(liveAt).getTime() - new Date(signupAt).getTime()) / 86400_000;
+        if (days <= 0) continue;
+        const niche = nicheById[cid] ?? "unknown";
+        const b = byNiche.get(niche) ?? { sum: 0, n: 0 };
+        b.sum += days; b.n += 1;
+        byNiche.set(niche, b);
+      }
+      const ttlRows = Array.from(byNiche.entries()).map(([niche, b]) => ({
+        niche: nicheLabel(niche),
+        days: b.n > 0 ? Math.round(b.sum / b.n) : 0,
+      })).sort((a, b) => a.days - b.days);
+      if (!cancelled) setTtl(ttlRows);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  return (
+    <section style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+      {/* Audit queue */}
+      <div style={{ background: "white", color: "#111827", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
+        <h3 style={{ margin: 0, marginBottom: 8, fontSize: 14 }}>My audit queue</h3>
+        <p style={{ color: "#9ca3af", margin: "0 0 12px", fontSize: 12 }}>Accounts waiting on your verdict, oldest first.</p>
+        {audit.length === 0 ? (
+          <p style={{ color: "#9ca3af", fontStyle: "italic", margin: 0, fontSize: 13 }}>Nothing in your queue 🎉</p>
+        ) : (
+          <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: 13 }}>
+            {audit.map((a) => (
+              <li key={a.id} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderTop: "1px solid #f3f4f6" }}>
+                <button type="button" onClick={() => navigate({ dept: "product", section: a.niche, id: "customer", sub: a.id })} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", padding: 0, fontSize: 13, textAlign: "left" }}>
+                  {a.name}
+                </button>
+                <span style={{ color: a.days >= 3 ? "#ef4444" : "#9ca3af", fontSize: 12 }}>{a.days}d</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* Top flagged issues this week */}
+      <div style={{ background: "white", color: "#111827", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
+        <h3 style={{ margin: 0, marginBottom: 8, fontSize: 14 }}>Top flagged issues this week</h3>
+        <p style={{ color: "#9ca3af", margin: "0 0 12px", fontSize: 12 }}>Highest priority by customer impact.</p>
+        {topIssues.length === 0 ? (
+          <p style={{ color: "#9ca3af", fontStyle: "italic", margin: 0, fontSize: 13 }}>No flagged issues this week.</p>
+        ) : (
+          <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: 13 }}>
+            {topIssues.map((i) => (
+              <li key={i.id} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderTop: "1px solid #f3f4f6", gap: 8 }}>
+                <button type="button" onClick={() => navigate({ dept: "product", section: "issues" })} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", padding: 0, fontSize: 13, textAlign: "left", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {i.title}
+                </button>
+                <span style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
+                  <span style={{ background: "#fee2e2", color: "#b91c1c", padding: "1px 6px", borderRadius: 999, fontSize: 11 }} title="flag count">{i.flag_count}🚩</span>
+                  <span style={{ background: "#dbeafe", color: "#1e40af", padding: "1px 6px", borderRadius: 999, fontSize: 11 }} title="customer count">{i.customer_count}👥</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* Avg time to live */}
+      <div style={{ background: "white", color: "#111827", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
+        <h3 style={{ margin: 0, marginBottom: 8, fontSize: 14 }}>Avg time to live</h3>
+        <p style={{ color: "#9ca3af", margin: "0 0 12px", fontSize: 12 }}>Signup → onboarding complete, per line.</p>
+        {ttl.length === 0 ? (
+          <p style={{ color: "#9ca3af", fontStyle: "italic", margin: 0, fontSize: 13 }}>Not enough completed journeys yet.</p>
+        ) : (
+          <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: 13 }}>
+            {ttl.map((r) => (
+              <li key={r.niche} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderTop: "1px solid #f3f4f6" }}>
+                <span>{r.niche}</span>
+                <span style={{ fontWeight: 600, color: r.days > 45 ? "#ef4444" : r.days > 30 ? "#f59e0b" : "#10b981" }}>{r.days} days</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
+  );
 }

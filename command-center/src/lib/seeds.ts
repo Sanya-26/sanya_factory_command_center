@@ -228,6 +228,11 @@ const stageRuns = COMPANIES_SEED.map((c, i) => ({
 const customer_flags: any[] = [];
 COMPANIES_SEED.forEach((c) => {
   (c.flags ?? []).forEach((f, fi) => {
+    // Link to underlying issues by keyword match (mimics triage agent output).
+    let linked_issue_id: string | null = null;
+    const title = f.title.toLowerCase();
+    if (title.includes("double-submit") || title.includes("duplicate")) linked_issue_id = "ti-double-submit";
+    if (title.includes("mobile") || title.includes("safari")) linked_issue_id = "ti-mobile-perf";
     customer_flags.push({
       id: `flag-${c.id}-${fi}`,
       company_id: c.id,
@@ -239,6 +244,9 @@ COMPANIES_SEED.forEach((c) => {
       status: f.status ?? "open",
       resolved_at: f.status === "resolved" ? ago(Math.max(0, f.daysAgo - 1)) : null,
       created_at: ago(f.daysAgo),
+      linked_issue_id,
+      triaged_at: linked_issue_id ? ago(Math.max(0, f.daysAgo - 0.1)) : null,
+      triaged_by: linked_issue_id ? "triage_agent:v1" : null,
     });
   });
 });
@@ -269,14 +277,16 @@ COMPANIES_SEED.filter((c) => c.has_checklist).forEach((c) => {
     signed_off_by: null,
     signed_off_at: null,
     items: [
-      { id: "smoke-home", label: "Home page loads cleanly", expected: "200 + branded layout", status: "pass" },
-      { id: "smoke-signup", label: "Customer signup flow works", expected: "Lands on /onboarding", status: "pass" },
-      { id: "smoke-search", label: "Search for a service returns results", expected: "Non-empty list", status: "pending" },
-      { id: "smoke-quote", label: "Quote request submits cleanly", expected: "Confirmation page", status: "pending" },
-      { id: "smoke-cms", label: "CMS shows latest data", expected: "Matches Supabase", status: "pending" },
-      { id: "smoke-mobile", label: "Mobile responsive (iPhone SE)", expected: "No horizontal scroll", status: "pending" },
-      { id: "smoke-perf", label: "LCP < 2.5s on 3G", expected: "Lighthouse score", status: "pending" },
-      { id: "smoke-a11y", label: "Axe critical/serious = 0", expected: "Zero", status: "pending" },
+      { id: "client-onboard", label: "Sign up as a brand-new customer end-to-end. Does it feel obvious without help?", expected: "Reach the home page logged in, no support needed", status: "pass" },
+      { id: "client-quote", label: "Submit a real quote request as a homeowner", expected: "Form asks the right questions, returns a sensible estimate", status: "pass" },
+      { id: "client-journeys", label: "Try the 3 most common journeys (browse → quote → schedule). Anything > 3 clicks?", expected: "All journeys under 3 clicks", status: "pending" },
+      { id: "client-mobile", label: "Open the site on a phone. Is anything cramped or broken?", expected: "Readable, no horizontal scroll, taps work", status: "pending" },
+      { id: "client-support", label: "Pretend to be a confused customer. Where does support live? Is it reachable?", expected: "Support link visible, contact form / chat works", status: "pending" },
+      { id: "client-copy", label: "Read the home page copy out loud. Does it sound like Splash Masters or like a template?", expected: "Brand voice consistent, no Lorem-ipsum feel", status: "pending" },
+      { id: "client-photos", label: "Check the photos. Are they from the real customer or stock?", expected: "Customer-supplied photos, not generic stock", status: "pending" },
+      { id: "client-ai", label: "Try the AI receptionist (if enabled). Does it answer the top 3 FAQs correctly?", expected: "Correct hours, services, pricing range", status: "pending" },
+      { id: "client-stress", label: "Try to break it: empty inputs, weird characters, double submits. Anything explode?", expected: "Graceful validation, no console errors", status: "pending" },
+      { id: "client-gut", label: "Gut check: would you recommend this to a friend in this niche today?", expected: "Yes, with no caveats", status: "pending" },
     ],
   });
 });
@@ -316,6 +326,65 @@ tech_issues.push({
   created_at: ago(14),
   updated_at: ago(13),
   closed_at: ago(13),
+});
+
+// ─── Flag-link issue: cross-customer pattern ───────────────────────────────
+// A single underlying issue with many flags from many customers — demonstrates
+// the triage agent's grouping and the priority score in the new Issues view.
+tech_issues.push({
+  id: "ti-mobile-perf",
+  company_id: null,
+  raised_by: SANYA_ID,
+  assignee_id: null,
+  title: "Site loads slowly on mobile (LCP > 4s)",
+  description: "Multiple customers reporting slow first paint on mobile devices, especially over LTE.",
+  severity: "high",
+  priority: "high",
+  status: "open",
+  created_at: ago(3),
+  updated_at: ago(1),
+  closed_at: null,
+});
+tech_issues.push({
+  id: "ti-double-submit",
+  company_id: null,
+  raised_by: SANYA_ID,
+  assignee_id: MITANSHI_ID,
+  title: "Lead form sometimes double-submits",
+  description: "When a user clicks Submit rapidly, the form fires twice creating duplicate leads.",
+  severity: "medium",
+  priority: "normal",
+  status: "in_progress",
+  created_at: ago(5),
+  updated_at: ago(1),
+  closed_at: null,
+});
+
+// Cross-customer flags pointing at the same underlying issues
+const extraFlags: any[] = [
+  { company_id: "c-pool-live-01", linked_issue_id: "ti-double-submit", severity: "medium", title: "Lead form sometimes double-submits", daysAgo: 3, source: "support_email" },
+  { company_id: "c-pool-live-01", linked_issue_id: "ti-mobile-perf", severity: "medium", title: "Site slow on my phone", daysAgo: 4, source: "chat" },
+  { company_id: "c-pool-live-02", linked_issue_id: "ti-mobile-perf", severity: "high", title: "Phone visitors bouncing — page takes 5s", daysAgo: 2, source: "manual" },
+  { company_id: "c-pool-live-03", linked_issue_id: "ti-mobile-perf", severity: "high", title: "Mobile lighthouse score 38", daysAgo: 1, source: "audit" },
+  { company_id: "c-game-live-01", linked_issue_id: "ti-mobile-perf", severity: "medium", title: "Slow load on iPhone", daysAgo: 3, source: "support_email" },
+  { company_id: "c-pool-live-02", linked_issue_id: "ti-double-submit", severity: "medium", title: "Duplicate leads in CRM", daysAgo: 4, source: "support_email" },
+];
+extraFlags.forEach((f, i) => {
+  customer_flags.push({
+    id: `flag-link-${i}`,
+    company_id: f.company_id,
+    reported_at: ago(f.daysAgo),
+    source: f.source,
+    severity: f.severity,
+    title: f.title,
+    body: null,
+    status: "open",
+    resolved_at: null,
+    created_at: ago(f.daysAgo),
+    linked_issue_id: f.linked_issue_id,
+    triaged_at: ago(f.daysAgo - 0.1),
+    triaged_by: "triage_agent:v1",
+  });
 });
 
 const sanya_audit_decisions: any[] = [];
