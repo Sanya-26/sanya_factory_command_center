@@ -127,7 +127,7 @@ export function ProductIssuesPage({ userId }: { userId: string }): JSX.Element {
     await load();
   }
 
-  const techOps = ops.filter((o) => o.role === "tech");
+  const assignableOps = ops.filter((o) => o.role === "tech" || o.role === "cto");
 
   return (
     <div style={{ padding: 24, display: "grid", gap: 16 }}>
@@ -146,7 +146,7 @@ export function ProductIssuesPage({ userId }: { userId: string }): JSX.Element {
         />
         <select value={assigneeFilter} onChange={(e) => setAssigneeFilter(e.target.value)} style={{ padding: "6px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13 }}>
           <option value="">All assignees</option>
-          {techOps.map((o) => (
+          {assignableOps.map((o) => (
             <option key={o.user_id} value={o.user_id}>{o.user_id.slice(0, 8)}…</option>
           ))}
         </select>
@@ -192,7 +192,7 @@ export function ProductIssuesPage({ userId }: { userId: string }): JSX.Element {
             <label>Assignee:{" "}
               <select value={newIssue.assignee_id} onChange={(e) => setNewIssue({ ...newIssue, assignee_id: e.target.value })}>
                 <option value="">— unassigned —</option>
-                {techOps.map((o) => <option key={o.user_id} value={o.user_id}>{o.user_id.slice(0, 8)}…</option>)}
+                {assignableOps.map((o) => <option key={o.user_id} value={o.user_id}>{o.role}: {o.user_id.slice(0, 8)}…</option>)}
               </select>
             </label>
           </div>
@@ -258,7 +258,7 @@ export function ProductIssuesPage({ userId }: { userId: string }): JSX.Element {
               <td style={{ padding: 10 }} onClick={(e) => e.stopPropagation()}>
                 <select value={i.assignee_id ?? ""} onChange={(e) => void setAssignee(i.id, e.target.value || null)} style={{ fontSize: 12 }}>
                   <option value="">— unassigned —</option>
-                  {techOps.map((o) => <option key={o.user_id} value={o.user_id}>{o.user_id.slice(0, 8)}…</option>)}
+                  {assignableOps.map((o) => <option key={o.user_id} value={o.user_id}>{o.role}: {o.user_id.slice(0, 8)}…</option>)}
                 </select>
               </td>
             </tr>

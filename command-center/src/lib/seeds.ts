@@ -312,6 +312,24 @@ COMPANIES_SEED.forEach((c) => {
     });
   }
 });
+// Issue assigned directly to V (CTO) to demonstrate delegation
+tech_issues.push({
+  id: "ti-cto-escalation",
+  company_id: "c-game-audit-01",
+  build_run_id: null,
+  raised_by: SANYA_ID,
+  assignee_id: V_ID,
+  title: "Live-scoring data freshness > 30s — needs architectural decision",
+  description: "Sanya flagged this during audit. Could be CDN cache, could be feed cadence. V to decide direction before assigning.",
+  severity: "high",
+  priority: "high",
+  status: "open",
+  mirrored_alert_id: null,
+  created_at: ago(1),
+  updated_at: ago(1),
+  closed_at: null,
+});
+
 // Add an extra "done" issue for variety
 tech_issues.push({
   id: "ti-done-01",
@@ -448,6 +466,54 @@ const proposal_artifacts: any[] = COMPANIES_SEED
 
 const niche_templates = niches;
 
+// Scheduled calls for the calendar widget (this week)
+const aheadDays = (days: number, hour = 10) => {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  d.setHours(hour, 0, 0, 0);
+  return d.toISOString();
+};
+const scheduled_calls = [
+  {
+    id: "sc-1",
+    company_id: "c-pool-sign-03",
+    offer_id: null,
+    slot_start: aheadDays(2, 10),
+    slot_end: aheadDays(2, 11),
+    agenda: "CLEO proposal walk-through",
+    provider: "google-meet",
+    meet_url: "https://meet.google.com/abc-defg-hij",
+    external_event_id: null,
+    created_at: ago(1),
+  },
+  {
+    id: "sc-2",
+    company_id: "c-pool-sign-04",
+    offer_id: null,
+    slot_start: aheadDays(3, 13),
+    slot_end: aheadDays(3, 14),
+    agenda: "Contract review",
+    provider: "google-meet",
+    meet_url: "https://meet.google.com/xyz-uvwq-rst",
+    external_event_id: null,
+    created_at: ago(0.5),
+  },
+  {
+    id: "sc-3",
+    company_id: "c-game-live-01",
+    offer_id: null,
+    slot_start: aheadDays(5, 15),
+    slot_end: aheadDays(5, 16),
+    agenda: "Quarterly business review",
+    provider: "google-meet",
+    meet_url: "https://meet.google.com/mno-pqrs-tuv",
+    external_event_id: null,
+    created_at: ago(2),
+  },
+];
+
+const call_slot_offers: any[] = [];
+
 export const INITIAL_DB = {
   companies,
   ops_users: opsUsers,
@@ -462,6 +528,8 @@ export const INITIAL_DB = {
   contract_drafts,
   proposal_artifacts,
   niche_templates,
+  scheduled_calls,
+  call_slot_offers,
 };
 
 export const SEEDED_USER_ID = SANYA_ID;

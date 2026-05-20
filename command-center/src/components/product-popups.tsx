@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Modal } from "./Modal";
 import { getFactorySupabase } from "../lib/factorySupabase";
+import { ProposalDeck } from "./ProposalDeck";
 
 interface ArtifactRow {
   id: string;
@@ -151,6 +152,18 @@ export function ProposalPopup({
 }) {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [niche, setNiche] = useState<string | null>(null);
+  const [monthlyUsd, setMonthlyUsd] = useState<number>(1495);
+  useEffect(() => {
+    if (!open) return;
+    void (async () => {
+      const sb = getFactorySupabase();
+      const { data } = await sb.from("companies").select("niche, monthly_usd").eq("id", companyId).maybeSingle();
+      const row = data as { niche?: string | null; monthly_usd?: number } | null;
+      setNiche(row?.niche ?? null);
+      if (row?.monthly_usd) setMonthlyUsd(Number(row.monthly_usd));
+    })();
+  }, [open, companyId]);
   async function send() {
     setSending(true);
     const sb = getFactorySupabase();
@@ -161,7 +174,7 @@ export function ProposalPopup({
       company_id: companyId,
       recipient_email: to,
       template: "proposal_send",
-      payload: { company_name: companyName },
+      payload: { company_name: companyName, monthly_usd: monthlyUsd },
       status: "queued",
     });
     setSent(true);
@@ -169,10 +182,8 @@ export function ProposalPopup({
     onSent?.();
   }
   return (
-    <Modal open={open} onClose={onClose} title={`Proposal · ${companyName}`} fullPageHref={fullPageHref}>
-      <MarkdownView
-        md={`# Proposal — ${companyName}\n\n## Scope\nFull CLEO platform: branded site, AI receptionist, quote calculator, drip nurture, project gallery, admin console.\n\n## Tier & pricing\n**Standard** — $1,495 / month. Includes everything in scope plus 100 AI receptionist calls/month and quarterly business reviews with Sanya.\n\n## Timeline\n3–5 business days from contract signature to live.\n\n## Financial benefit (90 days)\n- +30% qualified leads → ~+15 new projects/year\n- –50% time-to-quote → faster cash collection\n- Estimated incremental revenue: $45k–$80k annually for a typical operator your size.\n\n## Next step\nReview, then schedule a 30-min walk-through with Sanya.`}
-      />
+    <Modal open={open} onClose={onClose} title={`Proposal · ${companyName}`} fullPageHref={fullPageHref} width={900}>
+      <ProposalDeck companyName={companyName} niche={niche} monthlyUsd={monthlyUsd} />
       <div style={{ marginTop: 16, padding: 12, background: "#f9fafb", borderRadius: 8, display: "flex", alignItems: "center", gap: 12 }}>
         <button type="button" onClick={() => void send()} disabled={sending || sent} className="btn" style={{ padding: "6px 14px" }}>
           {sent ? "✓ Sent" : sending ? "Sending…" : "Send via email"}

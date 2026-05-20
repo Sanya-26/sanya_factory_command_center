@@ -10,9 +10,10 @@ import {
 } from "../../lib/health-score";
 import { phaseFor, PHASE_TITLE, type ProductPhase } from "../../lib/stage-labels";
 import { isActionEnabled, prereqMessage, stageMeta, type PhaseAction } from "../../lib/stage-actions";
-import { StatusDonut } from "../../components/charts/StatusDonut";
 import { PhaseFunnel } from "../../components/charts/PhaseFunnel";
 import { SkeletonBox } from "../../components/charts/LoadingSkeleton";
+import { ChartCard } from "../../components/ChartCard";
+import { AtRiskList } from "../../components/AtRiskList";
 import { MapPopup, SynopsisPopup, ProposalPopup } from "../../components/product-popups";
 import { ScheduleCallPopup } from "../../components/schedule-call-popup";
 
@@ -38,6 +39,13 @@ const PHASE_DESC: Record<ProductPhase, string> = {
   phase2: "The AI Factory is producing their tools and wiring integrations.",
   phase3: "Sanya is reviewing the deployed tenant against the client-value checklist.",
   live: "Customer is using their tool in production.",
+};
+
+const PHASE_LABEL_DESC: Record<string, string> = {
+  Sign: PHASE_DESC.phase1,
+  Build: PHASE_DESC.phase2,
+  Audit: PHASE_DESC.phase3,
+  Live: PHASE_DESC.live,
 };
 
 type PopupKind = "map" | "synopsis" | "proposal" | "schedule" | null;
@@ -127,12 +135,6 @@ export function ProductVariationPage({ niche }: { niche: string }): JSX.Element 
     live: grouped.live.length,
   }), [grouped]);
 
-  const healthCounts = useMemo(() => {
-    const c = { green: 0, yellow: 0, red: 0 };
-    for (const r of rows ?? []) c[r.health] += 1;
-    return c;
-  }, [rows]);
-
   const loading = rows === null && error === null;
 
   const openPopup = (kind: PopupKind, r: CompanyRow) => setPopup({ kind, companyId: r.id, companyName: r.name, email: r.email });
@@ -171,28 +173,31 @@ export function ProductVariationPage({ niche }: { niche: string }): JSX.Element 
       </header>
 
       <section style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 16 }}>
-        {loading ? <SkeletonBox height={220} /> : (
-          <PhaseFunnel
-            data={[
-              { phase: "Sign", count: phaseCounts.phase1 },
-              { phase: "Build", count: phaseCounts.phase2 },
-              { phase: "Audit", count: phaseCounts.phase3 },
-              { phase: "Live", count: phaseCounts.live },
-            ]}
-            niches={[{ slug: "count", label: titleFor(niche), color: PHASE_COLOR.phase2 }]}
-          />
-        )}
-        {loading ? <SkeletonBox height={220} /> : (
-          <StatusDonut
-            title="Customer health (live accounts)"
-            slices={[
-              { label: "Green", value: healthCounts.green, color: "#10b981" },
-              { label: "Yellow", value: healthCounts.yellow, color: "#f59e0b" },
-              { label: "Red", value: healthCounts.red, color: "#ef4444" },
-            ]}
-            height={170}
-          />
-        )}
+        <ChartCard
+          title="Phase funnel"
+          whatThisIs="Count of customers in each phase of the journey for this product line."
+          whatToDo="If Audit ≫ Build, you're the bottleneck. If Build ≫ Live, the Factory is."
+        >
+          {loading ? <SkeletonBox height={220} /> : (
+            <PhaseFunnel
+              data={[
+                { phase: "Sign", count: phaseCounts.phase1 },
+                { phase: "Build", count: phaseCounts.phase2 },
+                { phase: "Audit", count: phaseCounts.phase3 },
+                { phase: "Live", count: phaseCounts.live },
+              ]}
+              niches={[{ slug: "count", label: titleFor(niche), color: PHASE_COLOR.phase2 }]}
+              descriptions={PHASE_LABEL_DESC}
+            />
+          )}
+        </ChartCard>
+        <ChartCard
+          title="At-risk accounts"
+          whatThisIs="Every account in this line flagged yellow or red, with the specific reason."
+          whatToDo="Open the riskiest one and clear the root cause."
+        >
+          <AtRiskList nicheFilter={niche} maxRows={6} fallbackDept="product" />
+        </ChartCard>
       </section>
 
       {(["phase1", "phase2", "phase3", "live"] as ProductPhase[]).map((ph) => (
