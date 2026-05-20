@@ -324,6 +324,478 @@ The product variation card aggregates: variation health = worst account health a
 
 ---
 
+## 13. Local-first dev mode (no Supabase required)
+
+### 13.1 Goal & rationale
+Demo + iterate on the Product view without ever touching the real AI Factory Supabase. Empty-state / "Unknown error" screens go away. Reload-safe so screenshots and walk-throughs reproduce.
+
+### 13.2 Mechanism — drop-in mock client at `getFactorySupabase()`
+The whole Product view talks to Supabase through a single singleton in
+[command-center/src/lib/factorySupabase.ts](aubos_factory_ui/command-center/src/lib/factorySupabase.ts). That's the ONE injection point.
+
+**New env var**: `VITE_DATA_BACKEND` ∈ {`mock`, `supabase`}.
+- Default = `mock` in development (`import.meta.env.DEV`) when no `VITE_SUPABASE_URL` is set OR the URL equals `mock://local`.
+- Production builds default to `supabase`.
+
+**New file**: `command-center/src/lib/mockSupabase.ts` — exports `createMockClient()` returning an object that implements the **subset of Supabase JS used by the Product pages** (no MCP, no realtime, no auth). Surface required (from Phase 1 exploration):
+- `.from(table)` → query builder: `.select(...)`, `.insert(...)`, `.update(...)`, `.delete(...)`, with chainable `.eq()`, `.in()`, `.order()`, `.limit()`, `.maybeSingle()`, `.single()`
+- Tables backed by in-memory arrays:
+  `companies`, `ops_users`, `project_lifecycle_stage_runs`, `customer_flags`, `tech_issues`, `audit_checklists`, `sanya_audit_decisions`, `notifications`, `outbound_emails`, `contract_drafts`, `client_journey_events`, `proposal_artifacts`
+- Views backed by computed reducers over those arrays:
+  `v_account_health` (red/yellow/green per company, same formula as §9)
+  `v_financial_summary` (per-niche rollup)
+
+### 13.3 Seed data — `command-center/src/lib/seeds.ts`
+Bundled JSON-shaped fixtures. Counts that look realistic without being overwhelming:
+
+| Variation | Live | Phase 3 (audit) | Phase 2 (build) | Phase 1 (sign) |
+|---|---|---|---|---|
+| cleo-for-pools | 3 | 1 | 2 | 4 |
+| gameday-model | 1 | 1 | 1 | 2 |
+| real-estate-model | 0 | 0 | 1 | 3 |
+
+Each company gets a name, niche, email, current stage, 1–3 random `client_journey_events`, and 0–2 `customer_flags` of varying severity. Three companies get an `audit_checklists` row with 8–10 pre-filled items (some pass, some pending). Two `tech_issues` exist (1 open assigned to Mitanshi, 1 done). Two `sanya_audit_decisions` (one approve, one bugs). `outbound_emails` has 3 historical sent rows. `ops_users` mirror real names: Sanya (product_manager), Mitanshi + Adam (tech), V (cto), Ouadie (ceo).
+
+### 13.4 Persistence — `localStorage`
+Mock data lives in memory but **snapshots to `localStorage` on every write**, restored on page load. Reset button in dev menu (sidebar footer) wipes + re-seeds.
+
+### 13.5 Mode indicator
+Sidebar footer shows a "🧪 Local mock data" pill when `VITE_DATA_BACKEND=mock`, so it's never ambiguous which backend is live.
+
+### 13.6 Files to create / modify
+- **New**: `command-center/src/lib/mockSupabase.ts` — the fake client
+- **New**: `command-center/src/lib/seeds.ts` — fixtures
+- **Modified**: `command-center/src/lib/factorySupabase.ts` — env-gated dispatch
+- **Modified**: `command-center/src/shell/Sidebar.tsx` — mock-mode pill + reset button
+- **Modified**: `command-center/.env.example` — document `VITE_DATA_BACKEND`
+
+---
+
+## 14. Visualizations
+
+### 14.1 Library
+Add **recharts** to `command-center/package.json`. ~70 KB gzip, declarative, no D3 boilerplate, works with React 18. No other charts in the codebase today (only `@xyflow/react` for node-graph stuff in BusinessMap).
+
+### 14.2 Per-page additions
+
+**ProductHome.tsx**
+- Replace the dead "Green" stat tile with a **Health distribution donut** (counts of red / yellow / green across all live accounts).
+- Add a **Phase funnel** (vertical bar chart): Phase 1 → Phase 2 → Phase 3 → Live, stacked by variation.
+- Add a **MRR-by-niche bar chart** beside the financial summary table.
+- Each of the 3 product variation cards gains a tiny **sparkline** of `live_count` over the last 12 weeks (synthetic from journey events).
+
+**ProductVariation.tsx**
+- Above the customer table, a **horizontal stacked bar** showing the 4 phases' relative populations for this niche.
+- Each row's status pill becomes a **12-step progress strip** (one tick per stage, current one highlighted) — replaces the bare text label.
+
+**ProductCustomerDetail.tsx**
+- Above the 3 panels, a **horizontal stage stepper** spanning all 12 lifecycle stages (`intake … live`), current stage highlighted in blue.
+- New right-rail panel: **Activity timeline** — last 15 `client_journey_events` for the company (relative time + event_kind + actor).
+- Small **Health trend** line chart (last 30 days, RYG state changes).
+
+**ProductIssues.tsx**
+- Top strip: 4 stat tiles (Open / In progress / Blocked / Done last 7d) + a **Status donut**.
+- Add **search + assignee filter**.
+
+**ProductFlags.tsx**
+- Top: **Severity bar chart** (low/medium/high/critical counts) + a **Flags-over-time** sparkline.
+- Add **search by company / title**.
+
+### 14.3 Reusable chart components
+- `command-center/src/components/charts/StatusDonut.tsx` (red/yellow/green or severity buckets)
+- `command-center/src/components/charts/PhaseFunnel.tsx`
+- `command-center/src/components/charts/MrrByNicheBar.tsx`
+- `command-center/src/components/charts/Sparkline.tsx`
+- `command-center/src/components/charts/StageStepper.tsx`
+- `command-center/src/components/charts/ActivityTimeline.tsx`
+
+---
+
+## 15. Usability polish
+
+- **Loading skeletons** instead of "Unknown error" while fetches resolve.
+- **Empty-state CTAs** ("No customers yet — seed sample data?" button visible only in mock mode).
+- **Refresh button + auto-refresh** (30s) on the Home + Variation pages.
+- **Severity / status badges**: shared component, consistent palette across Issues, Flags, customer detail.
+- **Floating "Quick Actions" panel** on the customer detail page: Approve / Bugs / Disapprove + Email CTAs always reachable without scrolling.
+- **Search + filter** on Issues, Flags, and the customer table (text + status dropdown).
+- **Keyboard navigation**: `g h` → Home, `g v` → current variation, `g i` → Issues (using a small global key handler).
+- **Last-updated timestamp** in the top trail bar so you know how stale the data is.
+- **Mock-mode reset** in sidebar: wipes localStorage + re-seeds.
+
+---
+
+## 16. Sequencing for §13–§15
+
+To minimize churn:
+1. Add recharts + mock client + seeds + factorySupabase env-gate (the foundation).
+2. Verify all 6 pages still render against the mock with non-empty UIs.
+3. Add the 6 reusable chart components.
+4. Wire charts into ProductHome → ProductVariation → ProductCustomerDetail (heaviest pages first).
+5. Wire smaller charts into ProductIssues + ProductFlags.
+6. Add empty-state CTAs, loading skeletons, refresh, search/filter.
+7. Add mode pill + reset button to the sidebar.
+
+When the user later flips `VITE_DATA_BACKEND=supabase` (or applies the migration and the env defaults to supabase in dev), the same pages work against the real DB unchanged.
+
+---
+
+## 17. Round-2 feedback — PM walk-through fixes
+
+Feedback captured from Sanya's first walk-through of the live mock UI. This section overrides §4 / §14 / §15 where they conflict.
+
+### 17.1 Dashboard (`/#product/home`)
+
+**Bugs to fix**
+- KPI tile values are invisible: numbers render but inherit the shell's light text color on white tile. Fix by setting explicit `color: #111827` on tile values and labels (and applying the same fix to all data tables).
+- "Product variations" card text was invisible too — same root cause; same fix.
+
+**Renaming "Product variations" → "Product Lines"** (confirmed). Update everywhere: sidebar headers, dashboard tile, in-app copy, PRD doc.
+
+**"Whose account?" — Account Health donut needs context**
+- Retitle to **"Customer health (live accounts)"**.
+- Subtitle: "How many of your live customers are healthy right now."
+- Hover on a slice → tooltip lists customer names in that bucket.
+- Sub-link below the donut: "View red accounts →" filters to customers in red.
+
+**Variation cards: missing names + add a meaningful sparkline**
+- Each card displays the variation name as a large title (was visually swallowed), a 1-line stat row (`3 live · 7 in flight · $5,980 MRR`), and a sparkline.
+- Sparkline = **new live customers per month**, last 12 months — answers "is this product growing?"
+
+**PM-flavored widgets to add to the dashboard** (Sanya confirmed):
+- **My audit queue** — list of accounts at `sanya-audit` waiting on Sanya's verdict, with age in days, sorted oldest-first. Click row → opens that customer's detail at the audit panel.
+- **Top flagged issues this week** — top 5 rows from `v_issues_with_flag_stats` sorted by priority_score desc, restricted to issues with flag activity in the last 7 days. Click → Issues page filtered to that row.
+- **Average time to live (per niche)** — table or bar chart: signup → live days, computed from `client_journey_events` event pairs. Highlights slow niches.
+
+### 17.2 Per-niche page (applies to Cleo for Pools, Gameday, Real Estate)
+
+**Phase funnel: one-line description per phase**
+- "**Sign**: customer signed up, we're mapping their business and writing a proposal."
+- "**Build**: the AI Factory is producing their tools and wiring integrations."
+- "**Audit**: Sanya is reviewing the deployed tenant against the client-value checklist."
+- "**Live**: customer is using their tool in production."
+
+**Health donut: relabel + add tooltip context** (same fixes as §17.1).
+
+**Phase 1 row — gated action buttons**
+
+| Stage `stage_slug` | Status label shown | Map | Synopsis | Proposal | Contract | Schedule call |
+|---|---|---|---|---|---|---|
+| `intake` | **Map creating…** | ✗ disabled | ✗ disabled | ✗ disabled | ✗ disabled | — |
+| `council` | **Map created — drafting proposal** | ✓ | ✓ | ✗ disabled | ✗ disabled | — |
+| `proposal` | **Ready for call** | ✓ | ✓ | ✓ | ✗ disabled | ✓ enabled |
+| `proposing` | **Proposal sent — awaiting client** | ✓ | ✓ | ✓ | ✗ disabled | — |
+| `awaiting-approval` | **Contract pending signature** | ✓ | ✓ | ✓ | ✓ | — |
+
+**Phase 2 row — gated**
+
+| Stage | Status label | Production link | Integrations | Credentials | QC sign-off |
+|---|---|---|---|---|---|
+| `queued` / `planning` / `building` | **Factory producing tool…** | ✗ | ✗ | ✗ | (info-only chip showing "in progress") |
+| `deployed` | **Credentials + integrations ready** | ✓ | ✓ | ✓ | info-only chip: "✓ passed by Mitanshi 2h ago" |
+
+> QC sign-off is **not** a button — it's an info chip showing who signed off and when. (Sanya's feedback.)
+
+**Live row**
+- "Health" column shows the actual **traffic-light + score** (e.g., 🟢 92), clickable to drill into the customer detail health tab.
+- "Issues" column shows **"N issues"** count, clickable → opens that customer's issues filter.
+- "Flags" column shows **"N flags"** count, clickable → opens that customer's flags.
+
+**Click customer name** → navigate to `/#product/<niche>/customer/<id>` (already implemented; confirm action-button row no longer captures this gesture).
+
+### 17.3 Customer detail (`/#product/<niche>/customer/<id>`)
+
+**Stage-aware action panels**
+Each Phase panel shows only the buttons listed in the §17.2 gating tables, with disabled ones either greyed (with tooltip "available once map is created") or removed entirely (UX decision: **grey, don't remove** — so the user understands what's coming next). Active button gets a subtle blue glow.
+
+**Action button behaviors (mostly popups, not page nav)**
+- **Map** → opens `<MapPopup>` modal rendering `onboarding_canvas_states.canvas` for this company.
+- **Synopsis** → opens `<SynopsisPopup>` modal rendering the markdown synopsis stored in `proposal_artifacts (kind='synopsis')`.
+- **Proposal** → opens `<ProposalPopup>` modal showing the proposal markdown + a "Send via email" button inside.
+- **Contract** → opens the existing `ContractEditor` (already wired) in a side drawer.
+- **Schedule call** / **Ready for call** → opens a `<ScheduleCallPopup>` that lets Sanya pick a time and triggers a Google Meet invite (see AskUserQuestion for provider).
+
+**Phase 3 — Sanya's audit is client-focused, not tech-focused**
+The seeded checklist items become client-experience tasks, not smoke tests. New default items (the QC agent should generate similar ones):
+1. Sign up as a brand-new customer and complete the full onboarding without help. Does it feel obvious?
+2. Submit a real quote request as a homeowner. Does the form ask the right questions?
+3. Try the 3 most common journeys (browse → quote → schedule) and time each. Anything > 3 clicks?
+4. Open the site on a phone. Is anything cramped or broken?
+5. Pretend to be a confused customer. Where does support live? Is it reachable?
+6. Read the copy on the home page out loud. Does it sound like Crystal Clear Pools or like a template?
+7. Check the photos. Are they from the real customer or stock?
+8. Try the AI receptionist (if enabled). Does it answer the top 3 FAQs correctly?
+9. Try to break it: empty inputs, weird characters, double submits. Anything explode?
+10. Final gut check: would you recommend this to a friend in this niche today?
+
+**Live phase**
+- Header chip turns into a permanent banner: 🟢 Live since 2026-03-04 · Health: Green · 2 issues · 0 flags.
+- Replace the 2 button placeholders with: clickable issue count → opens issues filtered to this company; clickable flag count → opens flags filtered to this company; clickable health chip → opens a health history side panel.
+
+### 17.4 Issues + Flags redesign — the big one
+
+**Vocabulary**
+- **Flag** = customer-raised complaint or feature request. Many per customer.
+- **Issue** = the underlying engineering ticket Sanya tracks. One issue can collect many flags from many customers.
+- A **Triage Agent** processes new flags and either links each to an existing issue OR creates a new issue.
+
+**Data model additions**
+```sql
+alter table public.customer_flags
+  add column linked_issue_id uuid references public.tech_issues(id),
+  add column triaged_at timestamptz,
+  add column triaged_by text;  -- 'triage_agent:v1' or 'manual:<ops_user_id>'
+
+create or replace view public.v_issues_with_flag_stats as
+select
+  ti.*,
+  coalesce(s.flag_count, 0) as flag_count,
+  coalesce(s.customer_count, 0) as customer_count,
+  coalesce(s.flag_count, 0) + coalesce(s.customer_count, 0) * 2 as priority_score
+from public.tech_issues ti
+left join (
+  select linked_issue_id,
+         count(*) as flag_count,
+         count(distinct company_id) as customer_count
+  from public.customer_flags
+  where linked_issue_id is not null and status != 'resolved'
+  group by linked_issue_id
+) s on s.linked_issue_id = ti.id;
+```
+
+**Triage Agent** (new edge function `agents/triage-flag-run`)
+- Trigger: HTTP POST `{ flag_id }` on customer_flags insert.
+- Reads recent open `tech_issues` + the flag's title/body.
+- LLM call (`_shared/llm.ts`): classify as either an existing issue id OR a new issue.
+- If existing: UPDATE customer_flags SET linked_issue_id = X, triaged_at = now(), triaged_by = 'triage_agent:v1'.
+- If new: INSERT into tech_issues + link.
+- For local mock: implement a substring-similarity matcher (no LLM) — same flag titles get bucketed.
+
+**Issues page (`/#product/issues`) redesign**
+- New columns: **Flags** (count), **Customers** (distinct count), **Priority** (priority_score), Severity, Assignee, Created.
+- Default sort: priority_score desc.
+- Click an issue row → drawer/modal showing the flag list (customer name, title, reported_at) so Sanya understands the pattern.
+
+**Per-customer Flags page changes**
+- Add a "Linked issue" column. Click → opens issue drawer.
+
+**Why this matters**
+Without grouping, 10 customers each filing a "site is slow on mobile" flag look like 10 unrelated complaints. After triage, that's one issue with 10 flags from 10 customers — and the issue table sorts it to the top by priority. Sanya assigns it to one engineer, fix lands, all 10 flags resolve together.
+
+### 17.5 Modal popup + dedicated routes (Sanya wants both)
+- `command-center/src/components/Modal.tsx` — overlay + body slot + close button + Esc-to-close + click-overlay-to-close + "Open in full page →" header link.
+- Modals: `MapPopup`, `SynopsisPopup`, `ProposalPopup`, `ScheduleCallPopup`.
+- Dedicated routes for the same content (linkable / bookmarkable):
+  - `/#product/<niche>/customer/<id>/map`
+  - `/#product/<niche>/customer/<id>/synopsis`
+  - `/#product/<niche>/customer/<id>/proposal`
+- Action button on the customer detail row → opens the modal by default; the modal header's "Open full page" link navigates to the dedicated route. Both render the same `MapView` / `SynopsisView` / `ProposalView` component internally.
+
+### 17.5b Schedule-call — Google Meet via Google Calendar OAuth
+Existing wiring to reuse:
+- [src/pages/factory/CalendarOAuthCallback.tsx](aubos_factory_ui/command-center/src/pages/factory/CalendarOAuthCallback.tsx) — the OAuth landing page for Google Calendar (already handles the redirect_uri exchange).
+- [src/pages/factory/FactorySettings.tsx](aubos_factory_ui/command-center/src/pages/factory/FactorySettings.tsx) — connection state UI for the user's Google Calendar token (assume it stores the token; verify on implementation).
+
+New work:
+- `<ScheduleCallPopup>` — body shows: 30/45/60-min slot picker for the next 14 days using the user's free-busy. Inputs: customer name (pre-filled), customer email (pre-filled), agenda (defaults to "CLEO proposal walk-through").
+- On submit: POST to `agents-schedule-call` (new edge function) with `{ company_id, slot_start, slot_end, duration_min, agenda }`. The function uses the connected Google account's tokens to create a Calendar event with Meet enabled, invites the customer, and inserts an `outbound_emails` row of template `schedule_call_confirm` for the receipt.
+- Falls back gracefully when no Google account is connected: shows a "Connect Google Calendar →" link pointing at the existing OAuth start.
+- In **mock mode**, the popup pretends to schedule (writes a row to a new `scheduled_calls` mock table + `outbound_emails`) without hitting Google.
+
+### 17.6 Status-label + action-gating implementation
+- New `lib/stage-actions.ts` returns `{ statusLabel, enabledActions }` for a given stage_slug.
+- All Phase rows + the customer detail panels read from this single source.
+- Tooltip on disabled buttons: "Available once <prerequisite>".
+
+### 17.7 Seed data adjustments
+- Add `linked_issue_id` to the existing seed flags so the new issues view has stats out of the box (most-flagged issue: "Lead form double-submits" — 4 customers, 7 flags).
+- Add 3–5 more seed flags spread across customers to make the priority scoring visible.
+
+### 17.8 Apply to all 3 niches
+Everything in §17.2–§17.3 applies to Cleo for Pools, Gameday Model, and Real Estate Model identically. The stage labels and action gating are stage-driven (`stage_slug`), not niche-driven, so they carry across.
+
+---
+
+## 18. Round-3 feedback — Account Health, calendar, proposal, schedule flow, V assignment
+
+Captured from Sanya's second walk-through. Supersedes §17 where they conflict.
+
+### 18.1 Dashboard (`/#product/home`)
+
+- **Remove "Financial summary" table** — it duplicates the per-line cards.
+- **Reorder sections**: KPI tiles → existing PM widgets (My audit queue · Top flagged issues · Avg time to live) → Product lines (cards) → Charts row (Phase funnel + Account health redesign + MRR by niche).
+- **Account Health card — redesign**: drop the donut-only view; show an **"At-risk accounts" list** with WHY each one is at risk (e.g., "AquaArt Pools · Yellow · 1 high flag open + last e2e 9d ago"). A small inline status pill replaces the donut; the list is the actionable thing. Same redesign applies to per-niche page (§18.2).
+- **Calendar widget — new** on the overview: list of upcoming customer calls for the next 7 days, sourced from `scheduled_calls` (created by the new schedule-call flow §18.4). Each row: date/time · customer · agenda · Meet link (if any) · "Open" button. Empty state: "No calls scheduled this week."
+
+### 18.2 Per-niche page (Cleo for Pools / Gameday / Real Estate)
+- **Account health donut** on this page uses the same new design as §18.1 (at-risk customer list scoped to this niche).
+- **Phase funnel chart**: phase descriptions move into the chart **tooltip** (recharts `<Tooltip content={...}>`) instead of plain text below the title. Hovering "Sign" shows the sentence; same for Build/Audit/Live.
+
+### 18.3 Tooltip-with-insight on every chart
+A new shared `<ChartCard>` wrapper that gives any chart:
+- Optional title
+- A small `?` info icon in the top-right
+- On hover/click: a popover showing two short sentences — "**What this is**: …" and "**What to do with it**: …"
+
+Applied to every chart on the overview + niche pages. Example wording:
+- **Phase funnel**: "What this is: count of customers in each stage of the journey." / "What to do: if Audit ≫ Build, you're the bottleneck; if Build ≫ Live, the Factory is."
+- **Account health card**: "What this is: every live account flagged yellow or red, with the specific reason." / "What to do: open the riskiest one and clear the root cause."
+- **MRR by niche**: "What this is: monthly recurring revenue from signed/sent contracts per product line." / "What to do: compare to ACV — high MRR + low ACV = volume play; opposite = enterprise."
+- **My audit queue**: "What this is: accounts at the sanya-audit stage waiting on your verdict." / "What to do: clear oldest first; > 3d is a customer-experience risk."
+- **Top flagged issues**: "What this is: open issues ranked by flag count and distinct customers affected." / "What to do: assign the top-priority one to a tech engineer immediately."
+- **Avg time to live**: "What this is: average days from signup → onboarding-complete, per product line." / "What to do: if > 30d, find the bottleneck in Phase 1 or 2."
+- **Sparklines on variation cards**: "What this is: new live customers per month over the last 12 months." / "What to do: if flat, your top-of-funnel is the problem."
+
+### 18.4 Schedule-call flow — Sanya offers slots, customer picks
+
+The previous flow had Sanya book a slot directly. New flow:
+
+1. Sanya clicks "Schedule call" on a customer.
+2. `<ScheduleCallPopup>` lets her **multi-select 3–7 slots** that work for her over the next 14 days (toggle buttons; 30-min default duration).
+3. Submit creates a `call_slot_offers` row with the slot list + a unique short token.
+4. An `outbound_emails` row of template `schedule_call_offer` is queued, payload includes the public picker URL `https://welcome.aubos.ai/pick/<token>` (mock displays the URL in the success modal).
+5. Customer-facing slot-picker (out of scope for this iteration's app — would live in customer-ui repo; for mock, simulate it by adding a "Simulate client picks slot 2" button in mock mode that fires the confirmation path).
+6. When customer picks, Edge function `agents-schedule-call-confirm` creates the actual Google Calendar event with Meet link and writes a `scheduled_calls` row pointing back at the offer. Confirmation emails fire to both parties.
+7. The new Calendar widget (§18.1) reads from `scheduled_calls`.
+
+**Data model**
+```sql
+create table public.call_slot_offers (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid not null references companies(id),
+  offered_by uuid not null references ops_users(user_id),
+  agenda text not null,
+  duration_min int not null default 30,
+  slots jsonb not null,                    -- [{ start_iso, end_iso }]
+  picker_token text not null unique,
+  picked_slot_index int,
+  picked_at timestamptz,
+  created_at timestamptz default now(),
+  expires_at timestamptz default (now() + interval '7 days')
+);
+
+create table public.scheduled_calls (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid not null references companies(id),
+  offer_id uuid references call_slot_offers(id),
+  slot_start timestamptz not null,
+  slot_end timestamptz not null,
+  agenda text not null,
+  provider text default 'mock',           -- 'google-meet' in real backend
+  meet_url text,
+  external_event_id text,
+  created_at timestamptz default now()
+);
+```
+
+### 18.5 Proposal — beautiful presentation, not just markdown
+
+Replace the current `ProposalPopup` markdown rendering with a **slide-deck** layout:
+- 6–8 slides, swipeable / prev-next controls + a slide-counter / mini-thumbnail strip
+- Slides:
+  1. **Cover**: customer logo placeholder · niche · "Prepared for {Customer Name}" · date · big AUBOS / CLEO mark.
+  2. **The challenge**: 1-line problem statement + 2–3 stat callouts ("12% lead conversion · 41% after-hours misses").
+  3. **What CLEO will build**: 4 cards (branded site · AI receptionist · quote calculator · drip nurture) with icons.
+  4. **The customer experience**: before/after side-by-side (text from synopsis).
+  5. **Pricing**: tier card with monthly price + what's included; ROI projection underneath.
+  6. **Timeline**: 3–5 day Gantt-style block ("Day 1 intake · Day 2 build · Day 3 audit · Day 4 handover · Day 5 live").
+  7. **Why now**: 3 trends bullets.
+  8. **Next step**: big CTA "Schedule the 30-min walkthrough" + signature line.
+- Each slide is a React component composed via a `<Slide>` shell with consistent padding, typography, and a fixed footer ("CLEO · {Customer Name} · {date}").
+- "Send via email" still works — email body contains a snapshot link to the deck for the customer.
+- The popup keeps the "Open full page ↗" header link so Sanya can present full-screen.
+
+### 18.6 Issue assignment — V (CTO) can be assigned + can delegate
+
+- Issue assignee dropdown now lists everyone with `role IN ('tech','cto')` — i.e., Mitanshi, Adam, **and V**.
+- When the current logged-in user is V (role=cto), the Issues page lets V re-assign any issue assigned to himself to a tech ops_user. The existing assignee dropdown already supports this; the only change is filter relaxation.
+- A small "Reassign →" affordance shows for issues where `assignee_id = current_user.id` and the current user is `cto`, so V doesn't have to spelunk the dropdown to find the delegation.
+- Update the seed: add a 3rd issue assigned directly to V to demonstrate the delegation UX.
+
+### 18.7 Files to create / modify (round 3)
+
+**New**
+- `command-center/src/components/ChartCard.tsx` — chart wrapper with `?` info popover.
+- `command-center/src/components/AtRiskList.tsx` — replaces the StatusDonut on overview + niche pages.
+- `command-center/src/components/CalendarWidget.tsx` — upcoming meetings (next 7 days).
+- `command-center/src/components/ProposalDeck.tsx` — slide deck used by `ProposalPopup`.
+
+**Modified**
+- `command-center/src/pages/product/ProductHome.tsx` — reorder, remove financial summary, swap donut for AtRiskList, add CalendarWidget, wrap charts in ChartCard.
+- `command-center/src/pages/product/ProductVariation.tsx` — same AtRiskList swap + tooltipped phase funnel + ChartCard wrappers.
+- `command-center/src/components/charts/PhaseFunnel.tsx` — custom recharts tooltip with phase descriptions.
+- `command-center/src/components/product-popups.tsx` — `ProposalPopup` uses `ProposalDeck`.
+- `command-center/src/components/schedule-call-popup.tsx` — multi-select slots + offers flow.
+- `command-center/src/pages/product/ProductIssues.tsx` — assignee dropdown includes `cto`; "Reassign →" affordance when self-assigned and role=cto.
+- `command-center/src/lib/seeds.ts` — add 1 issue assigned to V; add a couple of `scheduled_calls` rows for the calendar widget to render against.
+- `command-center/src/lib/mockSupabase.ts` — accept new tables `call_slot_offers`, `scheduled_calls` (auto-created by first insert; no view changes).
+
+### 18.8 Verification (round 3)
+- Open `/#product/home`. Order: KPI · PM widgets · Product lines · Charts row. No financial summary table. Calendar widget shows seeded upcoming meetings.
+- Account-health card lists by name the at-risk customers + the reason for each.
+- Hover the `?` on any chart → popover with "What this is / What to do with it" copy.
+- Phase funnel: hovering a bar shows the bar value AND a one-sentence description of that phase.
+- Pacific Pools customer detail · click Schedule call → multi-slot picker → submit → success modal shows the email + the public picker URL.
+- Issues page assignee dropdown lists Mitanshi, Adam, V. Re-assign an issue from V → Adam from the dropdown.
+- Proposal click on Pacific Pools → slide deck modal opens; "Open full page" navigates to dedicated route.
+
+---
+
+## 19. Round-4 feedback — KPI insights, sparkline labels, Issues readability
+
+Captured from Sanya's third walk-through. Tightly scoped polish.
+
+### 19.1 KPI tiles need insights, not just numbers
+
+Each of the four tiles on `/#product/home` ("Overall business health", "MRR", "Live customers", "In flight") gets a **hover tooltip** with one short, data-driven insight. Mock data acceptable where the live data isn't expressive enough.
+
+| Tile | Insight (computed where possible, otherwise placeholder) |
+|---|---|
+| **Overall business health** | "2 accounts dipped to yellow this week — AquaArt Pools (1 high flag) and Stadium Stream (in audit > 4d). None red yet." |
+| **MRR (signed contracts)** | "+$1,495 this month from Splash Masters going live. Standard tier ($1,495) is 67% of revenue; premium is 22%." |
+| **Live customers** | "1 went live this week (Touchdown Tech, 2026-05-15). 2 more in audit awaiting your verdict." |
+| **In flight** | "Splash Masters has been in audit 2d — that's the oldest. 4 customers stuck in Phase 1 > 7 days." |
+
+Implementation:
+- New `<KpiTile>` component that wraps the existing layout + accepts a `tooltip` prop.
+- Hovering the tile reveals a small popover above it (similar visual to ChartCard's `?` popover but triggered by hover and no `?` icon).
+- Insights computed in `ProductHome` from existing data (stages, contracts, journey events). Fall back to a sensible static sentence when the data doesn't support a specific number.
+
+### 19.2 Sparklines on Product Line cards need a label
+
+The line chart on each product line card currently has zero context. Fix:
+- Add a label **below** the sparkline: "Signups · last 12 weeks" with a tiny trend chip ("↑ 25%" / "→ flat" / "↓ 12%").
+- Add a hover tooltip on the card itself with one insight, same pattern as §19.1:
+  - "Cleo for Pools is the fastest-growing line — 4 signups in the last 4 weeks vs 2 the previous 4."
+  - "Gameday Model is flat — last signup was 3 weeks ago."
+  - "Real Estate Model just started — 3 signups in the last 2 weeks, no live yet."
+
+### 19.3 Issues table readability
+
+The screenshot shows Status and Assignee dropdowns rendering as dark-gray-on-darker-gray — unreadable. Root cause: native `<select>` elements inherit no explicit color, so the OS dark theme paints them grey-on-grey when the parent has dark colors. The Issues table sets `color: #111827` on the table but the select OS UA styles take over.
+
+Fix:
+- Add a shared `selectStyle` constant: `{ background: "white", color: "#111827", border: "1px solid #d1d5db", padding: "4px 8px", borderRadius: 4, fontSize: 12 }`.
+- Apply it to **all** `<select>` elements on the Issues page (status, assignee, filter dropdowns) — and audit the other product pages for the same issue (ProductFlags resolve dropdown, ProductCustomerDetail checklist Pass/Fail).
+- The "open / in_progress / blocked / done / wontfix" status select gets a colored left border per state for extra glance-ability (optional micro-polish).
+
+### 19.4 Files to create / modify (round 4)
+
+**New**
+- `command-center/src/components/KpiTile.tsx` — tile with hover-tooltip slot.
+- `command-center/src/lib/insights.ts` — computes the four tile insights + the per-line sparkline insight from current mock/real data.
+
+**Modified**
+- `command-center/src/pages/product/ProductHome.tsx` — swap inline `<StatTile>` with `<KpiTile>`, pass computed insights; add sparkline label + trend chip on the variation cards; pass insight tooltip to each card.
+- `command-center/src/pages/product/ProductIssues.tsx` — apply `selectStyle` to every `<select>`. Same for ProductFlags resolve action and ProductCustomerDetail checklist status select.
+
+### 19.5 Verification
+- Hover each KPI tile → small popover with one insight appears above.
+- Hover each Product Line card → tooltip with growth insight. Below the sparkline: "Signups · last 12 weeks · ↑/→/↓ %".
+- Issues page: every select renders white-on-dark-text, readable at a glance. Same on Flags and Customer Detail checklist.
+
+---
+
 ## 12. Open questions to resolve before / during build
 
 - **Email provider** — Resend default unless Sanya/V picks otherwise.
