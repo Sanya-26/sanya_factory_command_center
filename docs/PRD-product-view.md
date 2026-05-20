@@ -796,6 +796,172 @@ Fix:
 
 ---
 
+## Appendix A — Catalog of new AI agents
+
+This is what's introduced in this PRD relative to the pre-existing AI Factory pipeline (Planner, Backend-dev, Frontend-dev, VPS-dev, Code-critic, Visual-a11y). Each new agent has its own daemon row in `agent_pods` and a registry row in `agent_registry`.
+
+### A.1 Synopsis Agent (§6.4)
+- **Purpose**: Turn the customer's onboarding canvas into a 1-page markdown summary that the proposal then quotes from.
+- **Trigger**: `onboarding_canvas_states.status = 'complete'`.
+- **Inputs**: `onboarding_canvas_states.canvas` JSON (before/after, modules, opportunities) + `companies.name`, `companies.niche`.
+- **Outputs**: `proposal_artifacts` row with `kind='synopsis'`; `notifications` row of kind `map-ready` to the product_manager.
+- **Edge function**: `supabase/functions/agents-synopsis-run/index.ts`.
+
+### A.2 Pricing Agent (§6.1)
+- **Purpose**: Author the financial section of the proposal — pricing tier, projected ROI, payback.
+- **Trigger**: Sanya clicks "Generate proposal" OR proposal_council finishes.
+- **Inputs**: `companies` (niche, size, region), `niche_templates.template`, `cleo_packages` price book.
+- **Outputs**: `proposal_artifacts` row with `kind='financial'`.
+- **Edge function**: `supabase/functions/agents-pricing-run/index.ts`.
+
+### A.3 Contract Agent (§6.2)
+- **Purpose**: Draft a SaaS contract for the customer, scoped to their niche and proposal.
+- **Trigger**: Sanya clicks "Generate contract" or proposal acceptance.
+- **Inputs**: `proposal_artifacts`, `niche_templates`, `companies` legal info.
+- **Outputs**: `contract_drafts` row (existing table, repurposed). Capabilities: create / edit / review (red-flag clauses) / version.
+- **Edge function**: `supabase/functions/agents-contract-run/index.ts`.
+- **Reuses**: existing `ContractEditor.tsx` for the editing UI.
+
+### A.4 QC Agent (§6.3)
+- **Purpose**: When a tenant deploys, generate a tailored client-experience audit checklist for Sanya (not tech smoke tests).
+- **Trigger**: project_lifecycle stage advances to `deployed`.
+- **Inputs**: `companies.niche`, `niche_templates.completeness_checklist`, deployed feature list, last `e2e_audit_runs`.
+- **Outputs**: `audit_checklists` row (new table); marks any prior checklist for that company `is_current=false`.
+- **Edge function**: `supabase/functions/agents-qc-run/index.ts`.
+- **Default items** (§17.3): "Sign up as a brand-new customer end-to-end. Does it feel obvious?", "Try to break it: empty inputs, weird characters", "Final gut check: would you recommend this to a friend?".
+
+### A.5 Triage Agent (§17.4) — NEW in v3 feedback round
+- **Purpose**: Group incoming customer flags onto the underlying engineering issues they represent. Without this, 10 customers reporting "site is slow on mobile" look like 10 unrelated complaints. After triage, they roll up to 1 issue with 10 flags — sortable to the top by priority.
+- **Trigger**: HTTP POST `{ flag_id }` on `customer_flags` insert (DB hook in production).
+- **Inputs**: the new flag's `title`/`body` + recent open `tech_issues`.
+- **Outputs**: UPDATE `customer_flags.linked_issue_id` to point at an existing issue, OR INSERT a new `tech_issues` row + link.
+- **Edge function**: `supabase/functions/agents-triage-flag-run/index.ts`.
+- **Mock implementation**: substring-similarity matcher (no LLM) in `lib/mockSupabase.ts` for local dev.
+
+### A.6 Schedule-Call Agent (§18.4) — NEW in v4 feedback round
+- **Purpose**: When the customer picks one of Sanya's offered slots, create a real Google Calendar event with a Meet link and confirm both parties.
+- **Trigger**: customer hits the `/pick/<token>` page and selects a slot (or for v1 mock: the "Simulate client picks slot 1" button).
+- **Inputs**: `call_slot_offers` row (new table) + the chosen slot index.
+- **Outputs**: `scheduled_calls` row (new table) with the Meet URL; two `outbound_emails` rows (`schedule_call_confirm` to customer + to Sanya).
+- **Edge function**: `supabase/functions/agents-schedule-call-confirm/index.ts` (plus the existing `agents-schedule-call` for offer-time work).
+
+### A.7 Emails Façade (§8.1, not strictly an agent but the email outbound)
+- **Purpose**: Drain `outbound_emails` (status=`queued`), pick provider (Resend default), send, mark sent or failed.
+- **Edge function**: `supabase/functions/emails-send/index.ts`.
+- **Templates supported**: `schedule_call_offer`, `schedule_call_confirm`, `proposal_send`, `contract_send`, `credentials_send`, `audit_invite`.
+
+---
+
+## Appendix B — Catalog of new tables / views / columns
+
+Everything introduced in this PRD. All migration SQL collected in `migrations/002_product_view.sql` (and the additions tracked under each feedback section).
+
+### B.1 New tables
+
+| Table | Purpose | Section |
+|---|---|---|
+| `customer_flags` | Customer-raised complaints. Many per customer. Triage Agent links each to a `tech_issues` row. | §7.1 + §17.4 columns |
+| `tech_issues` | Sanya-curated engineering tickets. Many flags can map to one issue. Mirrors to `tenant_alerts` on insert (trigger). | §7.1 |
+| `sanya_audit_decisions` | Append-only log of approve / bugs / disapprove verdicts. References related `tech_issues` ids when decision='bugs'. | §7.1 |
+| `audit_checklists` | Per-account, regenerated on each redeploy. `items jsonb` carries 8–10 client-experience checks. | §7.1 |
+| `outbound_emails` | Queue + log of every customer-facing email. Filled by app, drained by `emails-send` edge function. | §8.1 |
+| `call_slot_offers` | Sanya's offered slots for a customer call. `picker_token` enables the public picker URL. | §18.4 |
+| `scheduled_calls` | Confirmed customer calls, with Meet URL. Feeds the Calendar widget on overview. | §18.4 |
+
+### B.2 New columns on existing tables
+
+| Table.column | Type | Purpose |
+|---|---|---|
+| `customer_flags.linked_issue_id` | uuid → tech_issues | Set by Triage Agent. Drives the flag↔issue rollup. |
+| `customer_flags.triaged_at` | timestamptz | When the agent processed this flag. |
+| `customer_flags.triaged_by` | text | 'triage_agent:v1' or 'manual:<user_id>'. |
+| `tenant_health_snapshots.override_status` | text | Manual R/Y/G override; supersedes auto-computed. |
+| `tenant_health_snapshots.override_by` | uuid → ops_users | Who set the override. |
+| `tenant_health_snapshots.override_expires_at` | timestamptz | When the override stops being honored. |
+| `ops_users.role` (CHECK extended) | text | Adds `product_manager`, `tech`, `cto`, `ceo` to the allowed values. |
+
+### B.3 New views
+
+| View | Definition (summary) | Used by |
+|---|---|---|
+| `v_account_health` | Per-company red/yellow/green, computed from `tenant_alerts`, `customer_flags`, last-e2e age, runtime heartbeat. Respects active `tenant_health_snapshots.override_status`. | AtRiskList, KPI tile, variation cards |
+| `v_financial_summary` | Per-niche rollup: live_count / in_flight_count / churned_count / mrr_usd / avg_acv_usd. | ProductHome KPI math + per-line cards |
+| `v_issues_with_flag_stats` | `tech_issues` augmented with `flag_count` (open flags linked to this issue), `customer_count` (distinct companies among those flags), `priority_score = flag_count + 2*customer_count`. | Issues table sort + Top flagged widget |
+
+### B.4 niche_templates
+
+| Action | Description |
+|---|---|
+| Rename | `residential-pool-service` → `cleo-for-pools`. |
+| Insert | `gameday-model` (empty template; sample data). |
+| Insert | `real-estate-model` (empty template; sample data). |
+
+### B.5 New notification kinds (existing `notifications.kind` enum extension)
+
+| Kind | Recipient | Trigger |
+|---|---|---|
+| `map-ready` | product_manager | Synopsis Agent finishes |
+| `integrations-ready` | product_manager | tenant_runtimes hits 'integrations' |
+| `audit-bugs-high-priority` | tech roles + cto | Sanya decision=bugs |
+| `audit-disapproved` | cto, ceo | Sanya decision=disapprove |
+
+---
+
+## Appendix C — Catalog of new UI components
+
+All new files under `command-center/src/`. Filenames in the table; module purpose in the body.
+
+### C.1 Pages (under `pages/product/`)
+
+| File | What you see |
+|---|---|
+| `ProductHome.tsx` | Overview: 4 KPI tiles (with hover insights) · PM widgets (audit queue / top flagged / avg time to live) · 3 product line cards (with sparkline + trend chip + hover insight) · charts row (AtRiskList / PhaseFunnel / MRR by line) · Calendar widget. |
+| `ProductVariation.tsx` | Per-line page: Phase funnel (with per-phase tooltip descriptions) · AtRiskList scoped to this niche · 4 phase tables grouped by `phase1` / `phase2` / `phase3` / `live`. Action buttons gated per stage. Live row uses clickable counts not buttons. |
+| `ProductCustomerDetail.tsx` | Per-customer: 11-stage stepper · 3 phase panels with gated actions (Map, Synopsis, Proposal, Schedule call, Contract, Production link, Integrations, Credentials, QC sign-off chip) · audit checklist + Approve/Bugs/Disapprove decisions · activity timeline sidebar · quick actions panel. |
+| `ProductIssues.tsx` | Issues table sorted by `priority_score` desc. Columns: Issue · Flags · Customers · Priority · Severity · Status · Assignee (role-prefixed). Click row → modal listing linked flags from real customers. |
+| `ProductFlags.tsx` | Per-line flags view. Severity donut + 14-day reported sparkline. Linked-issue column per flag. |
+| `ProductSettings.tsx` | CTO-only role assignment UI. Lists every ops_users row, dropdown to change role. |
+
+### C.2 Shared widgets (under `components/`)
+
+| File | Used by | Purpose |
+|---|---|---|
+| `KpiTile.tsx` | ProductHome | Hover tooltip with one insight. |
+| `ChartCard.tsx` | Every chart/widget | "?" info button → "What this is / What to do" popover. |
+| `AtRiskList.tsx` | ProductHome + ProductVariation | Lists yellow/red customers with reasons. Replaces the donut. |
+| `CalendarWidget.tsx` | ProductHome | Next-7-days customer calls list. |
+| `Modal.tsx` | All popups | Generic overlay with Esc + click-outside + "Open full page ↗". |
+| `product-popups.tsx` | ProductVariation + Detail | MapPopup, SynopsisPopup, ProposalPopup wrappers. |
+| `ProposalDeck.tsx` | ProposalPopup | 8-slide deck (Cover · Challenge · What we build · Customer experience · Pricing · Timeline · Why now · Next step). |
+| `schedule-call-popup.tsx` | ProductVariation + Detail | Multi-slot offer flow. |
+
+### C.3 Chart components (under `components/charts/`)
+
+| File | Where |
+|---|---|
+| `StatusDonut.tsx` | Issue severity donut. |
+| `PhaseFunnel.tsx` | ProductHome + ProductVariation (with custom per-phase tooltip). |
+| `MrrByNicheBar.tsx` | ProductHome. |
+| `Sparkline.tsx` | ProductHome variation cards + ProductFlags. |
+| `StageStepper.tsx` | ProductCustomerDetail. |
+| `ActivityTimeline.tsx` | ProductCustomerDetail. |
+| `LoadingSkeleton.tsx` | Anywhere data is fetching. |
+
+### C.4 Libraries (under `lib/`)
+
+| File | Purpose |
+|---|---|
+| `stage-labels.ts` | Maps the existing 12 stage slugs → 3 PRD phase labels. |
+| `stage-actions.ts` | Per-stage status label + which action buttons are enabled + prereq tooltip text. Single source of truth. |
+| `health-score.ts` | TS wrapper around the `v_account_health` view + manual override helpers. |
+| `insights.ts` | Computes the 4 KPI tile insights and per-line growth insight from current data. |
+| `seeds.ts` | Local-only fixtures: 19 fake companies across the 3 lines + journey events + flags + issues + decisions + checklists + scheduled calls. |
+| `mockSupabase.ts` | The fake Supabase client. Singleton from `factorySupabase.ts`. Backed by `localStorage`. |
+| `factorySupabase.ts` | Env-gated dispatch between mock and real client. Exports `isMockBackend()` + `resetMockDB()`. |
+| `ui-styles.ts` | Shared `selectStyle` / `inputStyle` so native form controls render readably in the dark shell. |
+
+---
+
 ## 12. Open questions to resolve before / during build
 
 - **Email provider** — Resend default unless Sanya/V picks otherwise.

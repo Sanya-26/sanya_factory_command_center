@@ -1,0 +1,1434 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>PRD — Product-Manager View in command-center</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: white; color: #111827; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 11.5pt; line-height: 1.55; }
+  .page { max-width: 880px; margin: 0 auto; padding: 32px 48px 80px; }
+  h1 { font-size: 26pt; margin-top: 28pt; border-bottom: 2px solid #1f2937; padding-bottom: 6pt; }
+  h2 { font-size: 18pt; margin-top: 22pt; color: #1d4ed8; border-bottom: 1px solid #e5e7eb; padding-bottom: 4pt; }
+  h3 { font-size: 13pt; margin-top: 16pt; color: #0e7490; }
+  h4 { font-size: 11.5pt; margin-top: 12pt; color: #475569; }
+  p, ul, ol { margin: 8pt 0; }
+  ul, ol { padding-left: 20pt; }
+  li { margin: 3pt 0; }
+  table { border-collapse: collapse; width: 100%; margin: 10pt 0; font-size: 10pt; }
+  th, td { border: 1px solid #d1d5db; padding: 5pt 8pt; text-align: left; vertical-align: top; }
+  th { background: #f3f4f6; font-weight: 600; }
+  code { background: #f3f4f6; padding: 1pt 4pt; border-radius: 3pt; font-family: "SFMono-Regular", Consolas, monospace; font-size: 9.5pt; }
+  pre { background: #0f172a; color: #f1f5f9; padding: 12pt 14pt; border-radius: 6pt; overflow-x: auto; font-size: 9pt; line-height: 1.5; }
+  pre code { background: transparent; color: inherit; padding: 0; }
+  blockquote { border-left: 4px solid #2563eb; background: #eff6ff; margin: 10pt 0; padding: 8pt 12pt; color: #1e3a8a; }
+  a { color: #2563eb; text-decoration: none; }
+  hr { border: none; border-top: 1px solid #e5e7eb; margin: 24pt 0; }
+  /* Highlights for the appendices */
+  h2:where(:has(+ *)) { page-break-after: avoid; }
+  table { page-break-inside: avoid; }
+  pre { page-break-inside: avoid; }
+  /* Cover banner */
+  .cover { background: linear-gradient(135deg, #1d4ed8 0%, #7c3aed 100%); color: white; padding: 36pt 32pt; border-radius: 8pt; margin-bottom: 20pt; }
+  .cover h1 { color: white; border: none; margin: 0; font-size: 28pt; }
+  .cover .sub { font-size: 11pt; opacity: 0.9; margin-top: 10pt; }
+  .cover .meta { font-size: 9pt; opacity: 0.75; margin-top: 16pt; }
+  @page { size: Letter; margin: 0.5in; }
+  @media print {
+    .page { padding: 0; max-width: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+    <div class="cover">
+      <h1>Product-Manager View</h1>
+      <div class="sub">Command-center extension for product oversight, audit, and customer journey orchestration</div>
+      <div class="meta">CLEO · AUBOS · v5 · May 20, 2026 · Prepared for Sanya@aubos.ai</div>
+    </div>
+    <h1>PRD: Product-Manager View in command-center</h1>
+<h2>Context</h2>
+<p>The command-center today is one undifferentiated admin shell behind a binary <code>ops_users</code> → admin/not-admin gate. Sanya (Product) needs a view tailored to product oversight: per-product-variation dashboards, a customer-journey table with phase-grouped action buttons, an auditor&#39;s approval workflow, and the ability to assign issues to named engineers — without changing the Tech view that Mitanshi/Adam use day-to-day. Several supporting pieces don&#39;t exist yet (outbound email, synopsis/pricing/contract/QC agents, customer complaint intake), so they&#39;re scoped here too.</p>
+<p>Reusing the existing pipeline avoids fork-and-drift: the same <code>client_journey_events</code> / <code>project_lifecycle_stage_runs</code> data drives both views; the Product view re-skins it.</p>
+<hr>
+<h2>1. Personas &amp; roles</h2>
+<table>
+<thead>
+<tr>
+<th>Role slug</th>
+<th>Person(s)</th>
+<th>View</th>
+<th>Powers</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>product_manager</code></td>
+<td>Sanya</td>
+<td><strong>Product view</strong> (NEW)</td>
+<td>Browse all product variations, audit accounts, raise issues, send outbound emails to customers, approve/bug/disapprove builds</td>
+</tr>
+<tr>
+<td><code>tech</code></td>
+<td>Mitanshi, Adam</td>
+<td>Tech view (existing command-center as-is)</td>
+<td>Receive assigned issues, fix bugs, manage builds</td>
+</tr>
+<tr>
+<td><code>cto</code></td>
+<td>V</td>
+<td>Tech view + <strong>role-assignment UI</strong></td>
+<td>Only role that can promote / demote others&#39; <code>role</code>. Receives Sanya&#39;s &quot;high-priority fix&quot; escalations</td>
+</tr>
+<tr>
+<td><code>ceo</code></td>
+<td>Ouadie</td>
+<td>Tech view + <strong>fundamental-issue inbox</strong></td>
+<td>Receives Sanya&#39;s &quot;disapprove → fundamental issue&quot; escalations</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>Old PRD draft mentioned a &quot;CX&quot; role — confirmed dropped. Only the 4 roles above ship in v1.</p>
+</blockquote>
+<hr>
+<h2>2. Permission model</h2>
+<p><strong>Schema change</strong> — extend <code>ops_users.role</code> CHECK constraint to add the 4 new values:</p>
+<pre><code class="language-sql">alter table public.ops_users drop constraint if exists ops_users_role_check;
+alter table public.ops_users add constraint ops_users_role_check
+  check (role = any (array[
+    &#39;product_manager&#39;,&#39;tech&#39;,&#39;cto&#39;,&#39;ceo&#39;,  -- new canonical roles
+    &#39;founder&#39;,&#39;admin&#39;,&#39;operator&#39;,&#39;ops&#39;,&#39;counsel&#39;,&#39;content&#39;,&#39;staff&#39;,&#39;viewer&#39;  -- preserved for backwards compat
+  ]));
+</code></pre>
+<p><strong>Role-assignment UI</strong> — a new section in command-center settings, <strong>visible only when <code>role=&#39;cto&#39;</code></strong>. Lists every <code>ops_users</code> row + a dropdown to change role. All other roles see no admin section.</p>
+<p><strong>Frontend gate</strong> — extend <code>Shell.tsx</code> so the rendered sidebar + page router depends on <code>auth.role</code> not just <code>auth.status===&#39;admin&#39;</code>. Files affected:</p>
+<ul>
+<li><a href="aubos_factory_ui/command-center/src/App.tsx#L52-L111">src/App.tsx#L52-L111</a> — fetch <code>role</code> alongside admin check.</li>
+<li><a href="aubos_factory_ui/command-center/src/shell/Shell.tsx">src/shell/Shell.tsx</a> — branch on role.</li>
+<li><a href="aubos_factory_ui/command-center/src/shell/Sidebar.tsx">src/shell/Sidebar.tsx</a> — render Product sidebar (3 product cards + Issues + Settings) when <code>role=&#39;product_manager&#39;</code>; keep existing Cleo/AI-Factory sidebar for everyone else.</li>
+<li><a href="aubos_factory_ui/command-center/src/shell/route.ts">src/shell/route.ts</a> — add <code>product/*</code> route segments.</li>
+</ul>
+<hr>
+<h2>3. Information architecture (Product view)</h2>
+<pre><code>/product
+├── /                            Main dashboard
+├── /&lt;variation&gt;                 Per-product dashboard (cleo-for-pools | gameday-model | real-estate-model)
+│   ├── /                         Customer list (3-phase table)
+│   ├── /customer/&lt;company_id&gt;    Per-customer detail (status, flags, actions, audit panel)
+│   └── /flags                    All customer complaints for this variation
+├── /issues                       Tech issues assigned by Sanya (tech_issues + tenant_alerts)
+├── /settings                     CTO-only: role assignment + agent settings
+</code></pre>
+<hr>
+<h2>4. Pages</h2>
+<h3>4.1 Main dashboard (<code>/product</code>)</h3>
+<p>Top-level health view for the whole business.</p>
+<table>
+<thead>
+<tr>
+<th>Tile</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Overall business health (Red / Yellow / Green)</td>
+<td>Composite over all 3 variations (see §9)</td>
+</tr>
+<tr>
+<td>Financial metrics: MRR, ACV per variation, churn rate, runway</td>
+<td><code>companies.mrr_usd</code>, <code>cleo_packages.monthly_usd</code>, <code>tenant_token_usage</code> rollup. <em>New view</em> <code>v_financial_summary</code>.</td>
+</tr>
+<tr>
+<td>3 product cards: <strong>Cleo for Pools</strong>, <strong>Gameday Model</strong>, <strong>Real Estate Model</strong></td>
+<td>Each card shows: # live customers, # in-flight, # red-flagged, health traffic-light. Click → drills into <code>/product/&lt;variation&gt;</code></td>
+</tr>
+</tbody></table>
+<h3>4.2 Per-product dashboard (<code>/product/cleo-for-pools</code>, etc.)</h3>
+<p>A customer-row table grouped by the three PRD phases (see §5). Columns:</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Phase 1</th>
+<th>Phase 2</th>
+<th>Phase 3 (live)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Customer name</td>
+<td>Link to detail</td>
+<td>Link to detail</td>
+<td>Link to detail</td>
+</tr>
+<tr>
+<td>Current status</td>
+<td>e.g., &quot;Map created&quot;</td>
+<td>&quot;Factory producing&quot;</td>
+<td>&quot;Live&quot;</td>
+</tr>
+<tr>
+<td>Flags</td>
+<td>Red dot + count</td>
+<td>Red dot + count</td>
+<td>Red dot + count</td>
+</tr>
+<tr>
+<td>Actions</td>
+<td><strong>Map · Synopsis · Proposal · Contract</strong></td>
+<td><strong>Production link · Integrations · Credentials · QC sign-off</strong></td>
+<td><strong>Health · Open audit · Issues</strong></td>
+</tr>
+<tr>
+<td>Tech assignee (if any)</td>
+<td>—</td>
+<td>engineer avatar (Mitanshi/Adam)</td>
+<td>engineer avatar</td>
+</tr>
+</tbody></table>
+<h3>4.3 Per-customer detail (<code>/product/&lt;variation&gt;/customer/&lt;company_id&gt;</code>)</h3>
+<p>Three vertically stacked panels matching the 3 phases:</p>
+<p><strong>Phase 1 — Map → Contract Signed</strong></p>
+<ul>
+<li>Status pill: Map creating | Map created | Schedule call CTA | Call scheduled (DATE) | Send Contract CTA | Contract Signed</li>
+<li>Action buttons (always visible, gated by status):<ul>
+<li><strong>View Map</strong> → renders <code>onboarding_canvas_states.canvas_json</code></li>
+<li><strong>View Synopsis</strong> → renders <code>proposal_artifacts.synopsis_md</code> (generated by new Synopsis Agent, see §6.4)</li>
+<li><strong>View / Send Proposal</strong> → renders <code>proposal_artifacts.proposal_md</code> + financial section (from Pricing Agent §6.1). &quot;Send&quot; button triggers outbound email.</li>
+<li><strong>View / Edit / Send Contract</strong> → reuses existing <code>ContractEditor</code>; Send triggers outbound email.</li>
+</ul>
+</li>
+</ul>
+<p><strong>Phase 2 — Factory producing → Integrations</strong></p>
+<ul>
+<li>Status pill: Factory Producing Tool | Credentials | Integrations</li>
+<li>Action buttons:<ul>
+<li><strong>Production link</strong> → <code>tenant_runtimes.domain</code></li>
+<li><strong>Integrations list</strong> → existing <code>Integrations</code> component</li>
+<li><strong>Account credentials</strong> (view + &quot;Email credentials to client&quot; CTA)</li>
+<li><strong>QC sign-off</strong>: shows tech-team signer + timestamp from <code>cleo_self_tests.verdict=&#39;pass&#39;</code> rows.</li>
+</ul>
+</li>
+</ul>
+<p><strong>Phase 3 — Audit by Sanya</strong></p>
+<ul>
+<li><strong>QC Checklist</strong> (curated per account by new QC Agent §6.3): each row is a check Sanya runs manually with Pass/Fail/Note.</li>
+<li>Decision buttons:<ul>
+<li><strong>Approve</strong> → advance <code>project_lifecycle_stage_runs</code> to <code>live</code>; write decision row.</li>
+<li><strong>Bugs</strong> → modal to write per-bug notes + assign to engineer → INSERT into <code>tech_issues</code> (cascades to <code>tenant_alerts</code> severity=high, mentions CTO V&#39;s team via <code>notification_dispatchers</code>).</li>
+<li><strong>Disapprove</strong> → modal explains fundamental issue → INSERT decision + notification to CEO Ouadie + CTO V (severity=critical).</li>
+</ul>
+</li>
+</ul>
+<p><strong>Live</strong> (post-Phase 3 approve)</p>
+<ul>
+<li>Health traffic-light (see §9), customer complaints, last-N audit findings, link to runtime.</li>
+</ul>
+<h3>4.4 Issues page (<code>/product/issues</code>)</h3>
+<p>Stand-alone bug tracker view of <code>tech_issues</code> table (§7). Filter by assignee, status, priority. Sanya creates / closes here; Mitanshi &amp; Adam see the same rows in a Tech-view variant.</p>
+<hr>
+<h2>5. Phase mapping (existing 12 stages → PRD&#39;s 3 phases)</h2>
+<table>
+<thead>
+<tr>
+<th>PRD Phase</th>
+<th>Existing stages</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Phase 1</strong></td>
+<td><code>intake</code>, <code>council</code>, <code>proposal</code>, <code>awaiting-approval</code> (when waiting on contract signature)</td>
+</tr>
+<tr>
+<td><strong>Phase 2</strong></td>
+<td><code>queued</code>, <code>planning</code>, <code>building</code>, <code>deployed</code></td>
+</tr>
+<tr>
+<td><strong>Phase 3 (Audit)</strong></td>
+<td>New synthetic stage <code>sanya-audit</code> inserted between <code>deployed</code> and <code>live</code></td>
+</tr>
+<tr>
+<td><strong>Live</strong></td>
+<td><code>live</code></td>
+</tr>
+</tbody></table>
+<p>The Product view re-labels existing stage values to the PRD names (Map creating, Map created, Call scheduled, etc.) in a single lookup table in <code>lib/stage-labels.ts</code>.</p>
+<hr>
+<h2>6. New agents</h2>
+<p>Each is added to <code>agent_registry</code> + has its own daemon row in <code>agent_pods</code>.</p>
+<h3>6.1 Pricing Agent</h3>
+<ul>
+<li><strong>Trigger</strong>: when a proposal is requested for a company.</li>
+<li><strong>Input</strong>: <code>companies</code> row (niche, size, region) + <code>niche_templates.template</code> (cost model) + <code>cleo_packages</code> price book.</li>
+<li><strong>Output</strong>: financial section (MSRP, recurring, ROI projection) written into <code>proposal_artifacts.financial_md</code>.</li>
+<li><strong>Where it runs</strong>: Cloud agent (Claude/GPT) called from a Supabase Edge Function <code>agents/pricing-run</code>.</li>
+</ul>
+<h3>6.2 Contract Agent</h3>
+<ul>
+<li><strong>Trigger</strong>: when Sanya clicks &quot;Generate Contract&quot; (or auto on proposal acceptance).</li>
+<li><strong>Input</strong>: <code>proposal_artifacts</code> + <code>niche_templates.contract_template_md</code> + <code>companies</code> legal info.</li>
+<li><strong>Output</strong>: <code>contract_drafts</code> row (existing empty table; we&#39;ll define schema: company_id, draft_md, version, status, last_edited_by, last_edited_at, sent_at, signed_at).</li>
+<li><strong>Capabilities</strong>: create / edit / review (suggest red-flag clauses) / version.</li>
+<li><strong>Reuses</strong> existing <code>ContractEditor.tsx</code>.</li>
+</ul>
+<h3>6.3 QC Agent</h3>
+<ul>
+<li><strong>Trigger</strong>: when <code>deployed</code> stage completes (= tenant is up but not yet live).</li>
+<li><strong>Input</strong>: <code>companies.niche</code>, <code>niche_templates.completeness_checklist</code>, the tenant&#39;s features list, and last <code>e2e_audit_runs</code>.</li>
+<li><strong>Output</strong>: a curated checklist of test steps Sanya must run manually, persisted in new table <code>audit_checklists</code> (per-account, regenerated on each redeploy).</li>
+</ul>
+<h3>6.4 Synopsis Agent</h3>
+<ul>
+<li><strong>Trigger</strong>: when <code>onboarding_canvas_states.status=&#39;complete&#39;</code> (map finished).</li>
+<li><strong>Input</strong>: canvas JSON (before/after state, opportunities, modules).</li>
+<li><strong>Output</strong>: markdown synopsis stored in <code>proposal_artifacts.synopsis_md</code>. Triggers a <code>notifications</code> row (kind=<code>map-ready</code>, recipient=Sanya) — drives the bell + optional email.</li>
+</ul>
+<hr>
+<h2>7. New data model</h2>
+<h3>7.1 Schema additions</h3>
+<pre><code class="language-sql">-- Customer complaints / flags
+create table public.customer_flags (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid not null references public.companies(id),
+  reported_at timestamptz not null default now(),
+  source text not null,                  -- &#39;support_email&#39;, &#39;chat&#39;, &#39;manual&#39;, &#39;audit&#39;
+  severity text not null check (severity in (&#39;low&#39;,&#39;medium&#39;,&#39;high&#39;,&#39;critical&#39;)),
+  title text not null,
+  body text,
+  status text not null default &#39;open&#39;,   -- open | acknowledged | resolved
+  resolved_at timestamptz
+);
+
+-- Sanya-curated bug tracker (cascades to tenant_alerts)
+create table public.tech_issues (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid references public.companies(id),
+  build_run_id uuid references public.build_runs(id),
+  raised_by uuid references public.ops_users(user_id) not null,
+  assignee_id uuid references public.ops_users(user_id),
+  title text not null,
+  description text,
+  severity text not null default &#39;medium&#39;,
+  status text not null default &#39;open&#39;,   -- open | in_progress | blocked | done | wontfix
+  created_at timestamptz not null default now(),
+  closed_at timestamptz
+);
+-- Trigger: on insert/update, upsert a mirrored tenant_alerts row.
+
+-- Sanya&#39;s audit decisions
+create table public.sanya_audit_decisions (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid not null references public.companies(id),
+  decision text not null check (decision in (&#39;approve&#39;,&#39;bugs&#39;,&#39;disapprove&#39;)),
+  notes text,
+  bug_issue_ids uuid[],                  -- references tech_issues.id when decision=&#39;bugs&#39;
+  decided_at timestamptz not null default now()
+);
+
+-- Audit checklist per account (curated by QC Agent)
+create table public.audit_checklists (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid not null references public.companies(id),
+  generated_at timestamptz not null default now(),
+  items jsonb not null,                  -- [{ id, label, expected, status: pending|pass|fail, note, checked_by, checked_at }]
+  signed_off_by uuid references public.ops_users(user_id),
+  signed_off_at timestamptz
+);
+
+-- Manual health-score override (auto-calc lives in a view; this is the override)
+alter table public.tenant_health_snapshots
+  add column if not exists override_status text check (override_status in (&#39;green&#39;,&#39;yellow&#39;,&#39;red&#39;)),
+  add column if not exists override_by uuid references public.ops_users(user_id),
+  add column if not exists override_expires_at timestamptz;
+</code></pre>
+<h3>7.2 niche_templates additions</h3>
+<pre><code class="language-sql">-- Map PRD names to canonical slugs.
+update public.niche_templates set slug=&#39;cleo-for-pools&#39; where slug=&#39;residential-pool-service&#39;;
+insert into public.niche_templates (slug, display_name, template, completeness_checklist)
+values
+  (&#39;gameday-model&#39;, &#39;Gameday Model&#39;, &#39;{}&#39;::jsonb, &#39;[]&#39;::jsonb),
+  (&#39;real-estate-model&#39;, &#39;Real Estate Model&#39;, &#39;{}&#39;::jsonb, &#39;[]&#39;::jsonb)
+on conflict (slug) do nothing;
+</code></pre>
+<h3>7.3 Reused tables</h3>
+<ul>
+<li><code>client_journey_events</code> (event log)</li>
+<li><code>project_lifecycle_stage_runs</code> (stage timeline) — add new stage value <code>sanya-audit</code></li>
+<li><code>audit_requests</code> (existing audit workflow — read by Product view, written by approve/disapprove)</li>
+<li><code>tenant_alerts</code> (mirror target for tech_issues)</li>
+<li><code>notifications</code> + <code>notification_dispatchers</code> (in-app + Slack mention pipeline)</li>
+<li><code>proposal_artifacts</code> (synopsis_md, proposal_md, financial_md columns may need adding)</li>
+<li><code>contract_drafts</code> (define schema as in §6.2)</li>
+<li><code>onboarding_canvas_states</code> (map data)</li>
+</ul>
+<hr>
+<h2>8. Email &amp; notifications</h2>
+<h3>8.1 Outbound email</h3>
+<p><strong>Provider TBD</strong> (Sanya to choose later — Resend/Postmark/SendGrid/SES). PRD specifies the abstract interface:</p>
+<ul>
+<li><code>emailService.send({ to, template, data, replyTo, threadKey })</code></li>
+<li>Templates needed: <code>schedule_call</code>, <code>proposal_send</code>, <code>contract_send</code>, <code>credentials_send</code>, <code>audit_invite</code>.</li>
+<li>All sends logged in new table <code>outbound_emails</code> (id, to, template, payload_jsonb, sent_at, message_id, status).</li>
+</ul>
+<h3>8.2 In-app + Slack notifications (reuse)</h3>
+<p>Insert into <code>notifications</code> triggers <code>notification_dispatchers</code> (existing) which fan-outs to Slack mention via <code>ops_users.slack_user_id</code>. New <code>kind</code> values to add:</p>
+<ul>
+<li><code>map-ready</code> — Synopsis Agent finished, recipient=<code>product_manager</code>.</li>
+<li><code>integrations-ready</code> — <code>tenant_runtimes</code> reached <code>integrations</code> stage, recipient=<code>product_manager</code>.</li>
+<li><code>audit-disapproved</code> — Sanya disapprove decision, recipients=<code>cto</code>,<code>ceo</code>.</li>
+<li><code>audit-bugs-high-priority</code> — Sanya bug decision, recipients=<code>cto</code>,<code>tech</code>.</li>
+</ul>
+<hr>
+<h2>9. Health score (recommended formula)</h2>
+<p><strong>View <code>v_account_health</code></strong>, recomputed on read:</p>
+<pre><code>status = override_status (if set &amp; not expired)
+       ELSE worst of these signals:
+       
+       RED if any of:
+         - any tenant_alert with severity=&#39;critical&#39; unresolved &lt; 24h old
+         - any customer_flag with severity=&#39;critical&#39; status=&#39;open&#39;
+         - last successful e2e_audit_runs older than 14 days
+         - tenant_runtimes.last_heartbeat_at older than 30 min
+         
+       YELLOW if any of:
+         - any tenant_alert severity=&#39;high&#39; unresolved
+         - any customer_flag severity=&#39;high&#39; status=&#39;open&#39; 
+         - 2+ customer_flags severity=&#39;medium&#39; open
+         - last e2e older than 7 days
+         - 1+ open tech_issue severity in (&#39;high&#39;,&#39;critical&#39;)
+         
+       GREEN otherwise.
+</code></pre>
+<p>The product variation card aggregates: variation health = worst account health across its live accounts.</p>
+<hr>
+<h2>10. Files to create / modify</h2>
+<p><strong>New (Product view shell)</strong></p>
+<ul>
+<li><code>command-center/src/pages/product/index.tsx</code> — main dashboard</li>
+<li><code>command-center/src/pages/product/variation.tsx</code> — per-variation customer table</li>
+<li><code>command-center/src/pages/product/customer-detail.tsx</code> — 3-phase panel + decision buttons</li>
+<li><code>command-center/src/pages/product/issues.tsx</code> — tech_issues view</li>
+<li><code>command-center/src/pages/product/settings.tsx</code> — CTO-only role assignment + agent settings</li>
+<li><code>command-center/src/lib/stage-labels.ts</code> — 12-stage → PRD phase mapping</li>
+<li><code>command-center/src/lib/health-score.ts</code> — client-side wrapper around <code>v_account_health</code></li>
+</ul>
+<p><strong>Modified</strong></p>
+<ul>
+<li><code>command-center/src/App.tsx</code> — fetch + propagate <code>role</code></li>
+<li><code>command-center/src/shell/Shell.tsx</code> + <code>Sidebar.tsx</code> + <code>route.ts</code> — role-based sidebar</li>
+<li><code>command-center/src/pages/cleo-command-center/ContractEditor.tsx</code> — wire &quot;Send via email&quot; CTA</li>
+</ul>
+<p><strong>New supabase</strong></p>
+<ul>
+<li><code>migrations/002_product_view.sql</code> — all schema additions in §7</li>
+<li><code>supabase/functions/agents/pricing-run/</code> (Edge Function)</li>
+<li><code>supabase/functions/agents/contract-run/</code></li>
+<li><code>supabase/functions/agents/qc-run/</code></li>
+<li><code>supabase/functions/agents/synopsis-run/</code></li>
+<li><code>supabase/functions/emails/send/</code> (provider-agnostic façade)</li>
+</ul>
+<hr>
+<h2>11. Verification</h2>
+<ol>
+<li><strong>Permission switch</strong>: a CTO promotes a test user to <code>product_manager</code> → that user reloads command-center → sees Product sidebar, no Tech sidebar.</li>
+<li><strong>Phase 1 happy path</strong>: pick a company in <code>intake</code>; Map button renders canvas; click &quot;Send Proposal&quot; → row appears in <code>outbound_emails</code>, customer receives templated email (or mock log if provider stub).</li>
+<li><strong>Audit flow</strong>: advance a build to <code>sanya-audit</code>; checklist appears (generated by QC Agent); mark items pass; click Approve → <code>project_lifecycle_stage_runs</code> advances to <code>live</code> + decision row written.</li>
+<li><strong>Bug routing</strong>: click Bugs → assign Mitanshi → <code>tech_issues</code> row + mirrored <code>tenant_alerts</code> row + Slack mention to Mitanshi + Tech view shows the issue.</li>
+<li><strong>Disapprove routing</strong>: click Disapprove → CEO + CTO receive notification of kind <code>audit-disapproved</code> (visible in their NotificationBell).</li>
+<li><strong>Health score</strong>: insert a critical <code>tenant_alert</code> for a live company → its card flips to Red in &lt;2s (realtime).</li>
+<li><strong>Synopsis notification</strong>: mark a canvas as <code>status=&#39;complete&#39;</code> → Synopsis Agent runs → Sanya gets <code>map-ready</code> notification.</li>
+<li><strong>Niche additions</strong>: confirm <code>niche_templates</code> now has <code>cleo-for-pools</code>, <code>gameday-model</code>, <code>real-estate-model</code>.</li>
+</ol>
+<hr>
+<h2>13. Local-first dev mode (no Supabase required)</h2>
+<h3>13.1 Goal &amp; rationale</h3>
+<p>Demo + iterate on the Product view without ever touching the real AI Factory Supabase. Empty-state / &quot;Unknown error&quot; screens go away. Reload-safe so screenshots and walk-throughs reproduce.</p>
+<h3>13.2 Mechanism — drop-in mock client at <code>getFactorySupabase()</code></h3>
+<p>The whole Product view talks to Supabase through a single singleton in
+<a href="aubos_factory_ui/command-center/src/lib/factorySupabase.ts">command-center/src/lib/factorySupabase.ts</a>. That&#39;s the ONE injection point.</p>
+<p><strong>New env var</strong>: <code>VITE_DATA_BACKEND</code> ∈ {<code>mock</code>, <code>supabase</code>}.</p>
+<ul>
+<li>Default = <code>mock</code> in development (<code>import.meta.env.DEV</code>) when no <code>VITE_SUPABASE_URL</code> is set OR the URL equals <code>mock://local</code>.</li>
+<li>Production builds default to <code>supabase</code>.</li>
+</ul>
+<p><strong>New file</strong>: <code>command-center/src/lib/mockSupabase.ts</code> — exports <code>createMockClient()</code> returning an object that implements the <strong>subset of Supabase JS used by the Product pages</strong> (no MCP, no realtime, no auth). Surface required (from Phase 1 exploration):</p>
+<ul>
+<li><code>.from(table)</code> → query builder: <code>.select(...)</code>, <code>.insert(...)</code>, <code>.update(...)</code>, <code>.delete(...)</code>, with chainable <code>.eq()</code>, <code>.in()</code>, <code>.order()</code>, <code>.limit()</code>, <code>.maybeSingle()</code>, <code>.single()</code></li>
+<li>Tables backed by in-memory arrays:
+<code>companies</code>, <code>ops_users</code>, <code>project_lifecycle_stage_runs</code>, <code>customer_flags</code>, <code>tech_issues</code>, <code>audit_checklists</code>, <code>sanya_audit_decisions</code>, <code>notifications</code>, <code>outbound_emails</code>, <code>contract_drafts</code>, <code>client_journey_events</code>, <code>proposal_artifacts</code></li>
+<li>Views backed by computed reducers over those arrays:
+<code>v_account_health</code> (red/yellow/green per company, same formula as §9)
+<code>v_financial_summary</code> (per-niche rollup)</li>
+</ul>
+<h3>13.3 Seed data — <code>command-center/src/lib/seeds.ts</code></h3>
+<p>Bundled JSON-shaped fixtures. Counts that look realistic without being overwhelming:</p>
+<table>
+<thead>
+<tr>
+<th>Variation</th>
+<th>Live</th>
+<th>Phase 3 (audit)</th>
+<th>Phase 2 (build)</th>
+<th>Phase 1 (sign)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>cleo-for-pools</td>
+<td>3</td>
+<td>1</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td>gameday-model</td>
+<td>1</td>
+<td>1</td>
+<td>1</td>
+<td>2</td>
+</tr>
+<tr>
+<td>real-estate-model</td>
+<td>0</td>
+<td>0</td>
+<td>1</td>
+<td>3</td>
+</tr>
+</tbody></table>
+<p>Each company gets a name, niche, email, current stage, 1–3 random <code>client_journey_events</code>, and 0–2 <code>customer_flags</code> of varying severity. Three companies get an <code>audit_checklists</code> row with 8–10 pre-filled items (some pass, some pending). Two <code>tech_issues</code> exist (1 open assigned to Mitanshi, 1 done). Two <code>sanya_audit_decisions</code> (one approve, one bugs). <code>outbound_emails</code> has 3 historical sent rows. <code>ops_users</code> mirror real names: Sanya (product_manager), Mitanshi + Adam (tech), V (cto), Ouadie (ceo).</p>
+<h3>13.4 Persistence — <code>localStorage</code></h3>
+<p>Mock data lives in memory but <strong>snapshots to <code>localStorage</code> on every write</strong>, restored on page load. Reset button in dev menu (sidebar footer) wipes + re-seeds.</p>
+<h3>13.5 Mode indicator</h3>
+<p>Sidebar footer shows a &quot;🧪 Local mock data&quot; pill when <code>VITE_DATA_BACKEND=mock</code>, so it&#39;s never ambiguous which backend is live.</p>
+<h3>13.6 Files to create / modify</h3>
+<ul>
+<li><strong>New</strong>: <code>command-center/src/lib/mockSupabase.ts</code> — the fake client</li>
+<li><strong>New</strong>: <code>command-center/src/lib/seeds.ts</code> — fixtures</li>
+<li><strong>Modified</strong>: <code>command-center/src/lib/factorySupabase.ts</code> — env-gated dispatch</li>
+<li><strong>Modified</strong>: <code>command-center/src/shell/Sidebar.tsx</code> — mock-mode pill + reset button</li>
+<li><strong>Modified</strong>: <code>command-center/.env.example</code> — document <code>VITE_DATA_BACKEND</code></li>
+</ul>
+<hr>
+<h2>14. Visualizations</h2>
+<h3>14.1 Library</h3>
+<p>Add <strong>recharts</strong> to <code>command-center/package.json</code>. ~70 KB gzip, declarative, no D3 boilerplate, works with React 18. No other charts in the codebase today (only <code>@xyflow/react</code> for node-graph stuff in BusinessMap).</p>
+<h3>14.2 Per-page additions</h3>
+<p><strong>ProductHome.tsx</strong></p>
+<ul>
+<li>Replace the dead &quot;Green&quot; stat tile with a <strong>Health distribution donut</strong> (counts of red / yellow / green across all live accounts).</li>
+<li>Add a <strong>Phase funnel</strong> (vertical bar chart): Phase 1 → Phase 2 → Phase 3 → Live, stacked by variation.</li>
+<li>Add a <strong>MRR-by-niche bar chart</strong> beside the financial summary table.</li>
+<li>Each of the 3 product variation cards gains a tiny <strong>sparkline</strong> of <code>live_count</code> over the last 12 weeks (synthetic from journey events).</li>
+</ul>
+<p><strong>ProductVariation.tsx</strong></p>
+<ul>
+<li>Above the customer table, a <strong>horizontal stacked bar</strong> showing the 4 phases&#39; relative populations for this niche.</li>
+<li>Each row&#39;s status pill becomes a <strong>12-step progress strip</strong> (one tick per stage, current one highlighted) — replaces the bare text label.</li>
+</ul>
+<p><strong>ProductCustomerDetail.tsx</strong></p>
+<ul>
+<li>Above the 3 panels, a <strong>horizontal stage stepper</strong> spanning all 12 lifecycle stages (<code>intake … live</code>), current stage highlighted in blue.</li>
+<li>New right-rail panel: <strong>Activity timeline</strong> — last 15 <code>client_journey_events</code> for the company (relative time + event_kind + actor).</li>
+<li>Small <strong>Health trend</strong> line chart (last 30 days, RYG state changes).</li>
+</ul>
+<p><strong>ProductIssues.tsx</strong></p>
+<ul>
+<li>Top strip: 4 stat tiles (Open / In progress / Blocked / Done last 7d) + a <strong>Status donut</strong>.</li>
+<li>Add <strong>search + assignee filter</strong>.</li>
+</ul>
+<p><strong>ProductFlags.tsx</strong></p>
+<ul>
+<li>Top: <strong>Severity bar chart</strong> (low/medium/high/critical counts) + a <strong>Flags-over-time</strong> sparkline.</li>
+<li>Add <strong>search by company / title</strong>.</li>
+</ul>
+<h3>14.3 Reusable chart components</h3>
+<ul>
+<li><code>command-center/src/components/charts/StatusDonut.tsx</code> (red/yellow/green or severity buckets)</li>
+<li><code>command-center/src/components/charts/PhaseFunnel.tsx</code></li>
+<li><code>command-center/src/components/charts/MrrByNicheBar.tsx</code></li>
+<li><code>command-center/src/components/charts/Sparkline.tsx</code></li>
+<li><code>command-center/src/components/charts/StageStepper.tsx</code></li>
+<li><code>command-center/src/components/charts/ActivityTimeline.tsx</code></li>
+</ul>
+<hr>
+<h2>15. Usability polish</h2>
+<ul>
+<li><strong>Loading skeletons</strong> instead of &quot;Unknown error&quot; while fetches resolve.</li>
+<li><strong>Empty-state CTAs</strong> (&quot;No customers yet — seed sample data?&quot; button visible only in mock mode).</li>
+<li><strong>Refresh button + auto-refresh</strong> (30s) on the Home + Variation pages.</li>
+<li><strong>Severity / status badges</strong>: shared component, consistent palette across Issues, Flags, customer detail.</li>
+<li><strong>Floating &quot;Quick Actions&quot; panel</strong> on the customer detail page: Approve / Bugs / Disapprove + Email CTAs always reachable without scrolling.</li>
+<li><strong>Search + filter</strong> on Issues, Flags, and the customer table (text + status dropdown).</li>
+<li><strong>Keyboard navigation</strong>: <code>g h</code> → Home, <code>g v</code> → current variation, <code>g i</code> → Issues (using a small global key handler).</li>
+<li><strong>Last-updated timestamp</strong> in the top trail bar so you know how stale the data is.</li>
+<li><strong>Mock-mode reset</strong> in sidebar: wipes localStorage + re-seeds.</li>
+</ul>
+<hr>
+<h2>16. Sequencing for §13–§15</h2>
+<p>To minimize churn:</p>
+<ol>
+<li>Add recharts + mock client + seeds + factorySupabase env-gate (the foundation).</li>
+<li>Verify all 6 pages still render against the mock with non-empty UIs.</li>
+<li>Add the 6 reusable chart components.</li>
+<li>Wire charts into ProductHome → ProductVariation → ProductCustomerDetail (heaviest pages first).</li>
+<li>Wire smaller charts into ProductIssues + ProductFlags.</li>
+<li>Add empty-state CTAs, loading skeletons, refresh, search/filter.</li>
+<li>Add mode pill + reset button to the sidebar.</li>
+</ol>
+<p>When the user later flips <code>VITE_DATA_BACKEND=supabase</code> (or applies the migration and the env defaults to supabase in dev), the same pages work against the real DB unchanged.</p>
+<hr>
+<h2>17. Round-2 feedback — PM walk-through fixes</h2>
+<p>Feedback captured from Sanya&#39;s first walk-through of the live mock UI. This section overrides §4 / §14 / §15 where they conflict.</p>
+<h3>17.1 Dashboard (<code>/#product/home</code>)</h3>
+<p><strong>Bugs to fix</strong></p>
+<ul>
+<li>KPI tile values are invisible: numbers render but inherit the shell&#39;s light text color on white tile. Fix by setting explicit <code>color: #111827</code> on tile values and labels (and applying the same fix to all data tables).</li>
+<li>&quot;Product variations&quot; card text was invisible too — same root cause; same fix.</li>
+</ul>
+<p><strong>Renaming &quot;Product variations&quot; → &quot;Product Lines&quot;</strong> (confirmed). Update everywhere: sidebar headers, dashboard tile, in-app copy, PRD doc.</p>
+<p><strong>&quot;Whose account?&quot; — Account Health donut needs context</strong></p>
+<ul>
+<li>Retitle to <strong>&quot;Customer health (live accounts)&quot;</strong>.</li>
+<li>Subtitle: &quot;How many of your live customers are healthy right now.&quot;</li>
+<li>Hover on a slice → tooltip lists customer names in that bucket.</li>
+<li>Sub-link below the donut: &quot;View red accounts →&quot; filters to customers in red.</li>
+</ul>
+<p><strong>Variation cards: missing names + add a meaningful sparkline</strong></p>
+<ul>
+<li>Each card displays the variation name as a large title (was visually swallowed), a 1-line stat row (<code>3 live · 7 in flight · $5,980 MRR</code>), and a sparkline.</li>
+<li>Sparkline = <strong>new live customers per month</strong>, last 12 months — answers &quot;is this product growing?&quot;</li>
+</ul>
+<p><strong>PM-flavored widgets to add to the dashboard</strong> (Sanya confirmed):</p>
+<ul>
+<li><strong>My audit queue</strong> — list of accounts at <code>sanya-audit</code> waiting on Sanya&#39;s verdict, with age in days, sorted oldest-first. Click row → opens that customer&#39;s detail at the audit panel.</li>
+<li><strong>Top flagged issues this week</strong> — top 5 rows from <code>v_issues_with_flag_stats</code> sorted by priority_score desc, restricted to issues with flag activity in the last 7 days. Click → Issues page filtered to that row.</li>
+<li><strong>Average time to live (per niche)</strong> — table or bar chart: signup → live days, computed from <code>client_journey_events</code> event pairs. Highlights slow niches.</li>
+</ul>
+<h3>17.2 Per-niche page (applies to Cleo for Pools, Gameday, Real Estate)</h3>
+<p><strong>Phase funnel: one-line description per phase</strong></p>
+<ul>
+<li>&quot;<strong>Sign</strong>: customer signed up, we&#39;re mapping their business and writing a proposal.&quot;</li>
+<li>&quot;<strong>Build</strong>: the AI Factory is producing their tools and wiring integrations.&quot;</li>
+<li>&quot;<strong>Audit</strong>: Sanya is reviewing the deployed tenant against the client-value checklist.&quot;</li>
+<li>&quot;<strong>Live</strong>: customer is using their tool in production.&quot;</li>
+</ul>
+<p><strong>Health donut: relabel + add tooltip context</strong> (same fixes as §17.1).</p>
+<p><strong>Phase 1 row — gated action buttons</strong></p>
+<table>
+<thead>
+<tr>
+<th>Stage <code>stage_slug</code></th>
+<th>Status label shown</th>
+<th>Map</th>
+<th>Synopsis</th>
+<th>Proposal</th>
+<th>Contract</th>
+<th>Schedule call</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>intake</code></td>
+<td><strong>Map creating…</strong></td>
+<td>✗ disabled</td>
+<td>✗ disabled</td>
+<td>✗ disabled</td>
+<td>✗ disabled</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>council</code></td>
+<td><strong>Map created — drafting proposal</strong></td>
+<td>✓</td>
+<td>✓</td>
+<td>✗ disabled</td>
+<td>✗ disabled</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>proposal</code></td>
+<td><strong>Ready for call</strong></td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✗ disabled</td>
+<td>✓ enabled</td>
+</tr>
+<tr>
+<td><code>proposing</code></td>
+<td><strong>Proposal sent — awaiting client</strong></td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✗ disabled</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>awaiting-approval</code></td>
+<td><strong>Contract pending signature</strong></td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>—</td>
+</tr>
+</tbody></table>
+<p><strong>Phase 2 row — gated</strong></p>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Status label</th>
+<th>Production link</th>
+<th>Integrations</th>
+<th>Credentials</th>
+<th>QC sign-off</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>queued</code> / <code>planning</code> / <code>building</code></td>
+<td><strong>Factory producing tool…</strong></td>
+<td>✗</td>
+<td>✗</td>
+<td>✗</td>
+<td>(info-only chip showing &quot;in progress&quot;)</td>
+</tr>
+<tr>
+<td><code>deployed</code></td>
+<td><strong>Credentials + integrations ready</strong></td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>info-only chip: &quot;✓ passed by Mitanshi 2h ago&quot;</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>QC sign-off is <strong>not</strong> a button — it&#39;s an info chip showing who signed off and when. (Sanya&#39;s feedback.)</p>
+</blockquote>
+<p><strong>Live row</strong></p>
+<ul>
+<li>&quot;Health&quot; column shows the actual <strong>traffic-light + score</strong> (e.g., 🟢 92), clickable to drill into the customer detail health tab.</li>
+<li>&quot;Issues&quot; column shows <strong>&quot;N issues&quot;</strong> count, clickable → opens that customer&#39;s issues filter.</li>
+<li>&quot;Flags&quot; column shows <strong>&quot;N flags&quot;</strong> count, clickable → opens that customer&#39;s flags.</li>
+</ul>
+<p><strong>Click customer name</strong> → navigate to <code>/#product/&lt;niche&gt;/customer/&lt;id&gt;</code> (already implemented; confirm action-button row no longer captures this gesture).</p>
+<h3>17.3 Customer detail (<code>/#product/&lt;niche&gt;/customer/&lt;id&gt;</code>)</h3>
+<p><strong>Stage-aware action panels</strong>
+Each Phase panel shows only the buttons listed in the §17.2 gating tables, with disabled ones either greyed (with tooltip &quot;available once map is created&quot;) or removed entirely (UX decision: <strong>grey, don&#39;t remove</strong> — so the user understands what&#39;s coming next). Active button gets a subtle blue glow.</p>
+<p><strong>Action button behaviors (mostly popups, not page nav)</strong></p>
+<ul>
+<li><strong>Map</strong> → opens <code>&lt;MapPopup&gt;</code> modal rendering <code>onboarding_canvas_states.canvas</code> for this company.</li>
+<li><strong>Synopsis</strong> → opens <code>&lt;SynopsisPopup&gt;</code> modal rendering the markdown synopsis stored in <code>proposal_artifacts (kind=&#39;synopsis&#39;)</code>.</li>
+<li><strong>Proposal</strong> → opens <code>&lt;ProposalPopup&gt;</code> modal showing the proposal markdown + a &quot;Send via email&quot; button inside.</li>
+<li><strong>Contract</strong> → opens the existing <code>ContractEditor</code> (already wired) in a side drawer.</li>
+<li><strong>Schedule call</strong> / <strong>Ready for call</strong> → opens a <code>&lt;ScheduleCallPopup&gt;</code> that lets Sanya pick a time and triggers a Google Meet invite (see AskUserQuestion for provider).</li>
+</ul>
+<p><strong>Phase 3 — Sanya&#39;s audit is client-focused, not tech-focused</strong>
+The seeded checklist items become client-experience tasks, not smoke tests. New default items (the QC agent should generate similar ones):</p>
+<ol>
+<li>Sign up as a brand-new customer and complete the full onboarding without help. Does it feel obvious?</li>
+<li>Submit a real quote request as a homeowner. Does the form ask the right questions?</li>
+<li>Try the 3 most common journeys (browse → quote → schedule) and time each. Anything &gt; 3 clicks?</li>
+<li>Open the site on a phone. Is anything cramped or broken?</li>
+<li>Pretend to be a confused customer. Where does support live? Is it reachable?</li>
+<li>Read the copy on the home page out loud. Does it sound like Crystal Clear Pools or like a template?</li>
+<li>Check the photos. Are they from the real customer or stock?</li>
+<li>Try the AI receptionist (if enabled). Does it answer the top 3 FAQs correctly?</li>
+<li>Try to break it: empty inputs, weird characters, double submits. Anything explode?</li>
+<li>Final gut check: would you recommend this to a friend in this niche today?</li>
+</ol>
+<p><strong>Live phase</strong></p>
+<ul>
+<li>Header chip turns into a permanent banner: 🟢 Live since 2026-03-04 · Health: Green · 2 issues · 0 flags.</li>
+<li>Replace the 2 button placeholders with: clickable issue count → opens issues filtered to this company; clickable flag count → opens flags filtered to this company; clickable health chip → opens a health history side panel.</li>
+</ul>
+<h3>17.4 Issues + Flags redesign — the big one</h3>
+<p><strong>Vocabulary</strong></p>
+<ul>
+<li><strong>Flag</strong> = customer-raised complaint or feature request. Many per customer.</li>
+<li><strong>Issue</strong> = the underlying engineering ticket Sanya tracks. One issue can collect many flags from many customers.</li>
+<li>A <strong>Triage Agent</strong> processes new flags and either links each to an existing issue OR creates a new issue.</li>
+</ul>
+<p><strong>Data model additions</strong></p>
+<pre><code class="language-sql">alter table public.customer_flags
+  add column linked_issue_id uuid references public.tech_issues(id),
+  add column triaged_at timestamptz,
+  add column triaged_by text;  -- &#39;triage_agent:v1&#39; or &#39;manual:&lt;ops_user_id&gt;&#39;
+
+create or replace view public.v_issues_with_flag_stats as
+select
+  ti.*,
+  coalesce(s.flag_count, 0) as flag_count,
+  coalesce(s.customer_count, 0) as customer_count,
+  coalesce(s.flag_count, 0) + coalesce(s.customer_count, 0) * 2 as priority_score
+from public.tech_issues ti
+left join (
+  select linked_issue_id,
+         count(*) as flag_count,
+         count(distinct company_id) as customer_count
+  from public.customer_flags
+  where linked_issue_id is not null and status != &#39;resolved&#39;
+  group by linked_issue_id
+) s on s.linked_issue_id = ti.id;
+</code></pre>
+<p><strong>Triage Agent</strong> (new edge function <code>agents/triage-flag-run</code>)</p>
+<ul>
+<li>Trigger: HTTP POST <code>{ flag_id }</code> on customer_flags insert.</li>
+<li>Reads recent open <code>tech_issues</code> + the flag&#39;s title/body.</li>
+<li>LLM call (<code>_shared/llm.ts</code>): classify as either an existing issue id OR a new issue.</li>
+<li>If existing: UPDATE customer_flags SET linked_issue_id = X, triaged_at = now(), triaged_by = &#39;triage_agent:v1&#39;.</li>
+<li>If new: INSERT into tech_issues + link.</li>
+<li>For local mock: implement a substring-similarity matcher (no LLM) — same flag titles get bucketed.</li>
+</ul>
+<p><strong>Issues page (<code>/#product/issues</code>) redesign</strong></p>
+<ul>
+<li>New columns: <strong>Flags</strong> (count), <strong>Customers</strong> (distinct count), <strong>Priority</strong> (priority_score), Severity, Assignee, Created.</li>
+<li>Default sort: priority_score desc.</li>
+<li>Click an issue row → drawer/modal showing the flag list (customer name, title, reported_at) so Sanya understands the pattern.</li>
+</ul>
+<p><strong>Per-customer Flags page changes</strong></p>
+<ul>
+<li>Add a &quot;Linked issue&quot; column. Click → opens issue drawer.</li>
+</ul>
+<p><strong>Why this matters</strong>
+Without grouping, 10 customers each filing a &quot;site is slow on mobile&quot; flag look like 10 unrelated complaints. After triage, that&#39;s one issue with 10 flags from 10 customers — and the issue table sorts it to the top by priority. Sanya assigns it to one engineer, fix lands, all 10 flags resolve together.</p>
+<h3>17.5 Modal popup + dedicated routes (Sanya wants both)</h3>
+<ul>
+<li><code>command-center/src/components/Modal.tsx</code> — overlay + body slot + close button + Esc-to-close + click-overlay-to-close + &quot;Open in full page →&quot; header link.</li>
+<li>Modals: <code>MapPopup</code>, <code>SynopsisPopup</code>, <code>ProposalPopup</code>, <code>ScheduleCallPopup</code>.</li>
+<li>Dedicated routes for the same content (linkable / bookmarkable):<ul>
+<li><code>/#product/&lt;niche&gt;/customer/&lt;id&gt;/map</code></li>
+<li><code>/#product/&lt;niche&gt;/customer/&lt;id&gt;/synopsis</code></li>
+<li><code>/#product/&lt;niche&gt;/customer/&lt;id&gt;/proposal</code></li>
+</ul>
+</li>
+<li>Action button on the customer detail row → opens the modal by default; the modal header&#39;s &quot;Open full page&quot; link navigates to the dedicated route. Both render the same <code>MapView</code> / <code>SynopsisView</code> / <code>ProposalView</code> component internally.</li>
+</ul>
+<h3>17.5b Schedule-call — Google Meet via Google Calendar OAuth</h3>
+<p>Existing wiring to reuse:</p>
+<ul>
+<li><a href="aubos_factory_ui/command-center/src/pages/factory/CalendarOAuthCallback.tsx">src/pages/factory/CalendarOAuthCallback.tsx</a> — the OAuth landing page for Google Calendar (already handles the redirect_uri exchange).</li>
+<li><a href="aubos_factory_ui/command-center/src/pages/factory/FactorySettings.tsx">src/pages/factory/FactorySettings.tsx</a> — connection state UI for the user&#39;s Google Calendar token (assume it stores the token; verify on implementation).</li>
+</ul>
+<p>New work:</p>
+<ul>
+<li><code>&lt;ScheduleCallPopup&gt;</code> — body shows: 30/45/60-min slot picker for the next 14 days using the user&#39;s free-busy. Inputs: customer name (pre-filled), customer email (pre-filled), agenda (defaults to &quot;CLEO proposal walk-through&quot;).</li>
+<li>On submit: POST to <code>agents-schedule-call</code> (new edge function) with <code>{ company_id, slot_start, slot_end, duration_min, agenda }</code>. The function uses the connected Google account&#39;s tokens to create a Calendar event with Meet enabled, invites the customer, and inserts an <code>outbound_emails</code> row of template <code>schedule_call_confirm</code> for the receipt.</li>
+<li>Falls back gracefully when no Google account is connected: shows a &quot;Connect Google Calendar →&quot; link pointing at the existing OAuth start.</li>
+<li>In <strong>mock mode</strong>, the popup pretends to schedule (writes a row to a new <code>scheduled_calls</code> mock table + <code>outbound_emails</code>) without hitting Google.</li>
+</ul>
+<h3>17.6 Status-label + action-gating implementation</h3>
+<ul>
+<li>New <code>lib/stage-actions.ts</code> returns <code>{ statusLabel, enabledActions }</code> for a given stage_slug.</li>
+<li>All Phase rows + the customer detail panels read from this single source.</li>
+<li>Tooltip on disabled buttons: &quot;Available once <prerequisite>&quot;.</li>
+</ul>
+<h3>17.7 Seed data adjustments</h3>
+<ul>
+<li>Add <code>linked_issue_id</code> to the existing seed flags so the new issues view has stats out of the box (most-flagged issue: &quot;Lead form double-submits&quot; — 4 customers, 7 flags).</li>
+<li>Add 3–5 more seed flags spread across customers to make the priority scoring visible.</li>
+</ul>
+<h3>17.8 Apply to all 3 niches</h3>
+<p>Everything in §17.2–§17.3 applies to Cleo for Pools, Gameday Model, and Real Estate Model identically. The stage labels and action gating are stage-driven (<code>stage_slug</code>), not niche-driven, so they carry across.</p>
+<hr>
+<h2>18. Round-3 feedback — Account Health, calendar, proposal, schedule flow, V assignment</h2>
+<p>Captured from Sanya&#39;s second walk-through. Supersedes §17 where they conflict.</p>
+<h3>18.1 Dashboard (<code>/#product/home</code>)</h3>
+<ul>
+<li><strong>Remove &quot;Financial summary&quot; table</strong> — it duplicates the per-line cards.</li>
+<li><strong>Reorder sections</strong>: KPI tiles → existing PM widgets (My audit queue · Top flagged issues · Avg time to live) → Product lines (cards) → Charts row (Phase funnel + Account health redesign + MRR by niche).</li>
+<li><strong>Account Health card — redesign</strong>: drop the donut-only view; show an <strong>&quot;At-risk accounts&quot; list</strong> with WHY each one is at risk (e.g., &quot;AquaArt Pools · Yellow · 1 high flag open + last e2e 9d ago&quot;). A small inline status pill replaces the donut; the list is the actionable thing. Same redesign applies to per-niche page (§18.2).</li>
+<li><strong>Calendar widget — new</strong> on the overview: list of upcoming customer calls for the next 7 days, sourced from <code>scheduled_calls</code> (created by the new schedule-call flow §18.4). Each row: date/time · customer · agenda · Meet link (if any) · &quot;Open&quot; button. Empty state: &quot;No calls scheduled this week.&quot;</li>
+</ul>
+<h3>18.2 Per-niche page (Cleo for Pools / Gameday / Real Estate)</h3>
+<ul>
+<li><strong>Account health donut</strong> on this page uses the same new design as §18.1 (at-risk customer list scoped to this niche).</li>
+<li><strong>Phase funnel chart</strong>: phase descriptions move into the chart <strong>tooltip</strong> (recharts <code>&lt;Tooltip content={...}&gt;</code>) instead of plain text below the title. Hovering &quot;Sign&quot; shows the sentence; same for Build/Audit/Live.</li>
+</ul>
+<h3>18.3 Tooltip-with-insight on every chart</h3>
+<p>A new shared <code>&lt;ChartCard&gt;</code> wrapper that gives any chart:</p>
+<ul>
+<li>Optional title</li>
+<li>A small <code>?</code> info icon in the top-right</li>
+<li>On hover/click: a popover showing two short sentences — &quot;<strong>What this is</strong>: …&quot; and &quot;<strong>What to do with it</strong>: …&quot;</li>
+</ul>
+<p>Applied to every chart on the overview + niche pages. Example wording:</p>
+<ul>
+<li><strong>Phase funnel</strong>: &quot;What this is: count of customers in each stage of the journey.&quot; / &quot;What to do: if Audit ≫ Build, you&#39;re the bottleneck; if Build ≫ Live, the Factory is.&quot;</li>
+<li><strong>Account health card</strong>: &quot;What this is: every live account flagged yellow or red, with the specific reason.&quot; / &quot;What to do: open the riskiest one and clear the root cause.&quot;</li>
+<li><strong>MRR by niche</strong>: &quot;What this is: monthly recurring revenue from signed/sent contracts per product line.&quot; / &quot;What to do: compare to ACV — high MRR + low ACV = volume play; opposite = enterprise.&quot;</li>
+<li><strong>My audit queue</strong>: &quot;What this is: accounts at the sanya-audit stage waiting on your verdict.&quot; / &quot;What to do: clear oldest first; &gt; 3d is a customer-experience risk.&quot;</li>
+<li><strong>Top flagged issues</strong>: &quot;What this is: open issues ranked by flag count and distinct customers affected.&quot; / &quot;What to do: assign the top-priority one to a tech engineer immediately.&quot;</li>
+<li><strong>Avg time to live</strong>: &quot;What this is: average days from signup → onboarding-complete, per product line.&quot; / &quot;What to do: if &gt; 30d, find the bottleneck in Phase 1 or 2.&quot;</li>
+<li><strong>Sparklines on variation cards</strong>: &quot;What this is: new live customers per month over the last 12 months.&quot; / &quot;What to do: if flat, your top-of-funnel is the problem.&quot;</li>
+</ul>
+<h3>18.4 Schedule-call flow — Sanya offers slots, customer picks</h3>
+<p>The previous flow had Sanya book a slot directly. New flow:</p>
+<ol>
+<li>Sanya clicks &quot;Schedule call&quot; on a customer.</li>
+<li><code>&lt;ScheduleCallPopup&gt;</code> lets her <strong>multi-select 3–7 slots</strong> that work for her over the next 14 days (toggle buttons; 30-min default duration).</li>
+<li>Submit creates a <code>call_slot_offers</code> row with the slot list + a unique short token.</li>
+<li>An <code>outbound_emails</code> row of template <code>schedule_call_offer</code> is queued, payload includes the public picker URL <code>https://welcome.aubos.ai/pick/&lt;token&gt;</code> (mock displays the URL in the success modal).</li>
+<li>Customer-facing slot-picker (out of scope for this iteration&#39;s app — would live in customer-ui repo; for mock, simulate it by adding a &quot;Simulate client picks slot 2&quot; button in mock mode that fires the confirmation path).</li>
+<li>When customer picks, Edge function <code>agents-schedule-call-confirm</code> creates the actual Google Calendar event with Meet link and writes a <code>scheduled_calls</code> row pointing back at the offer. Confirmation emails fire to both parties.</li>
+<li>The new Calendar widget (§18.1) reads from <code>scheduled_calls</code>.</li>
+</ol>
+<p><strong>Data model</strong></p>
+<pre><code class="language-sql">create table public.call_slot_offers (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid not null references companies(id),
+  offered_by uuid not null references ops_users(user_id),
+  agenda text not null,
+  duration_min int not null default 30,
+  slots jsonb not null,                    -- [{ start_iso, end_iso }]
+  picker_token text not null unique,
+  picked_slot_index int,
+  picked_at timestamptz,
+  created_at timestamptz default now(),
+  expires_at timestamptz default (now() + interval &#39;7 days&#39;)
+);
+
+create table public.scheduled_calls (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid not null references companies(id),
+  offer_id uuid references call_slot_offers(id),
+  slot_start timestamptz not null,
+  slot_end timestamptz not null,
+  agenda text not null,
+  provider text default &#39;mock&#39;,           -- &#39;google-meet&#39; in real backend
+  meet_url text,
+  external_event_id text,
+  created_at timestamptz default now()
+);
+</code></pre>
+<h3>18.5 Proposal — beautiful presentation, not just markdown</h3>
+<p>Replace the current <code>ProposalPopup</code> markdown rendering with a <strong>slide-deck</strong> layout:</p>
+<ul>
+<li>6–8 slides, swipeable / prev-next controls + a slide-counter / mini-thumbnail strip</li>
+<li>Slides:<ol>
+<li><strong>Cover</strong>: customer logo placeholder · niche · &quot;Prepared for {Customer Name}&quot; · date · big AUBOS / CLEO mark.</li>
+<li><strong>The challenge</strong>: 1-line problem statement + 2–3 stat callouts (&quot;12% lead conversion · 41% after-hours misses&quot;).</li>
+<li><strong>What CLEO will build</strong>: 4 cards (branded site · AI receptionist · quote calculator · drip nurture) with icons.</li>
+<li><strong>The customer experience</strong>: before/after side-by-side (text from synopsis).</li>
+<li><strong>Pricing</strong>: tier card with monthly price + what&#39;s included; ROI projection underneath.</li>
+<li><strong>Timeline</strong>: 3–5 day Gantt-style block (&quot;Day 1 intake · Day 2 build · Day 3 audit · Day 4 handover · Day 5 live&quot;).</li>
+<li><strong>Why now</strong>: 3 trends bullets.</li>
+<li><strong>Next step</strong>: big CTA &quot;Schedule the 30-min walkthrough&quot; + signature line.</li>
+</ol>
+</li>
+<li>Each slide is a React component composed via a <code>&lt;Slide&gt;</code> shell with consistent padding, typography, and a fixed footer (&quot;CLEO · {Customer Name} · {date}&quot;).</li>
+<li>&quot;Send via email&quot; still works — email body contains a snapshot link to the deck for the customer.</li>
+<li>The popup keeps the &quot;Open full page ↗&quot; header link so Sanya can present full-screen.</li>
+</ul>
+<h3>18.6 Issue assignment — V (CTO) can be assigned + can delegate</h3>
+<ul>
+<li>Issue assignee dropdown now lists everyone with <code>role IN (&#39;tech&#39;,&#39;cto&#39;)</code> — i.e., Mitanshi, Adam, <strong>and V</strong>.</li>
+<li>When the current logged-in user is V (role=cto), the Issues page lets V re-assign any issue assigned to himself to a tech ops_user. The existing assignee dropdown already supports this; the only change is filter relaxation.</li>
+<li>A small &quot;Reassign →&quot; affordance shows for issues where <code>assignee_id = current_user.id</code> and the current user is <code>cto</code>, so V doesn&#39;t have to spelunk the dropdown to find the delegation.</li>
+<li>Update the seed: add a 3rd issue assigned directly to V to demonstrate the delegation UX.</li>
+</ul>
+<h3>18.7 Files to create / modify (round 3)</h3>
+<p><strong>New</strong></p>
+<ul>
+<li><code>command-center/src/components/ChartCard.tsx</code> — chart wrapper with <code>?</code> info popover.</li>
+<li><code>command-center/src/components/AtRiskList.tsx</code> — replaces the StatusDonut on overview + niche pages.</li>
+<li><code>command-center/src/components/CalendarWidget.tsx</code> — upcoming meetings (next 7 days).</li>
+<li><code>command-center/src/components/ProposalDeck.tsx</code> — slide deck used by <code>ProposalPopup</code>.</li>
+</ul>
+<p><strong>Modified</strong></p>
+<ul>
+<li><code>command-center/src/pages/product/ProductHome.tsx</code> — reorder, remove financial summary, swap donut for AtRiskList, add CalendarWidget, wrap charts in ChartCard.</li>
+<li><code>command-center/src/pages/product/ProductVariation.tsx</code> — same AtRiskList swap + tooltipped phase funnel + ChartCard wrappers.</li>
+<li><code>command-center/src/components/charts/PhaseFunnel.tsx</code> — custom recharts tooltip with phase descriptions.</li>
+<li><code>command-center/src/components/product-popups.tsx</code> — <code>ProposalPopup</code> uses <code>ProposalDeck</code>.</li>
+<li><code>command-center/src/components/schedule-call-popup.tsx</code> — multi-select slots + offers flow.</li>
+<li><code>command-center/src/pages/product/ProductIssues.tsx</code> — assignee dropdown includes <code>cto</code>; &quot;Reassign →&quot; affordance when self-assigned and role=cto.</li>
+<li><code>command-center/src/lib/seeds.ts</code> — add 1 issue assigned to V; add a couple of <code>scheduled_calls</code> rows for the calendar widget to render against.</li>
+<li><code>command-center/src/lib/mockSupabase.ts</code> — accept new tables <code>call_slot_offers</code>, <code>scheduled_calls</code> (auto-created by first insert; no view changes).</li>
+</ul>
+<h3>18.8 Verification (round 3)</h3>
+<ul>
+<li>Open <code>/#product/home</code>. Order: KPI · PM widgets · Product lines · Charts row. No financial summary table. Calendar widget shows seeded upcoming meetings.</li>
+<li>Account-health card lists by name the at-risk customers + the reason for each.</li>
+<li>Hover the <code>?</code> on any chart → popover with &quot;What this is / What to do with it&quot; copy.</li>
+<li>Phase funnel: hovering a bar shows the bar value AND a one-sentence description of that phase.</li>
+<li>Pacific Pools customer detail · click Schedule call → multi-slot picker → submit → success modal shows the email + the public picker URL.</li>
+<li>Issues page assignee dropdown lists Mitanshi, Adam, V. Re-assign an issue from V → Adam from the dropdown.</li>
+<li>Proposal click on Pacific Pools → slide deck modal opens; &quot;Open full page&quot; navigates to dedicated route.</li>
+</ul>
+<hr>
+<h2>19. Round-4 feedback — KPI insights, sparkline labels, Issues readability</h2>
+<p>Captured from Sanya&#39;s third walk-through. Tightly scoped polish.</p>
+<h3>19.1 KPI tiles need insights, not just numbers</h3>
+<p>Each of the four tiles on <code>/#product/home</code> (&quot;Overall business health&quot;, &quot;MRR&quot;, &quot;Live customers&quot;, &quot;In flight&quot;) gets a <strong>hover tooltip</strong> with one short, data-driven insight. Mock data acceptable where the live data isn&#39;t expressive enough.</p>
+<table>
+<thead>
+<tr>
+<th>Tile</th>
+<th>Insight (computed where possible, otherwise placeholder)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Overall business health</strong></td>
+<td>&quot;2 accounts dipped to yellow this week — AquaArt Pools (1 high flag) and Stadium Stream (in audit &gt; 4d). None red yet.&quot;</td>
+</tr>
+<tr>
+<td><strong>MRR (signed contracts)</strong></td>
+<td>&quot;+$1,495 this month from Splash Masters going live. Standard tier ($1,495) is 67% of revenue; premium is 22%.&quot;</td>
+</tr>
+<tr>
+<td><strong>Live customers</strong></td>
+<td>&quot;1 went live this week (Touchdown Tech, 2026-05-15). 2 more in audit awaiting your verdict.&quot;</td>
+</tr>
+<tr>
+<td><strong>In flight</strong></td>
+<td>&quot;Splash Masters has been in audit 2d — that&#39;s the oldest. 4 customers stuck in Phase 1 &gt; 7 days.&quot;</td>
+</tr>
+</tbody></table>
+<p>Implementation:</p>
+<ul>
+<li>New <code>&lt;KpiTile&gt;</code> component that wraps the existing layout + accepts a <code>tooltip</code> prop.</li>
+<li>Hovering the tile reveals a small popover above it (similar visual to ChartCard&#39;s <code>?</code> popover but triggered by hover and no <code>?</code> icon).</li>
+<li>Insights computed in <code>ProductHome</code> from existing data (stages, contracts, journey events). Fall back to a sensible static sentence when the data doesn&#39;t support a specific number.</li>
+</ul>
+<h3>19.2 Sparklines on Product Line cards need a label</h3>
+<p>The line chart on each product line card currently has zero context. Fix:</p>
+<ul>
+<li>Add a label <strong>below</strong> the sparkline: &quot;Signups · last 12 weeks&quot; with a tiny trend chip (&quot;↑ 25%&quot; / &quot;→ flat&quot; / &quot;↓ 12%&quot;).</li>
+<li>Add a hover tooltip on the card itself with one insight, same pattern as §19.1:<ul>
+<li>&quot;Cleo for Pools is the fastest-growing line — 4 signups in the last 4 weeks vs 2 the previous 4.&quot;</li>
+<li>&quot;Gameday Model is flat — last signup was 3 weeks ago.&quot;</li>
+<li>&quot;Real Estate Model just started — 3 signups in the last 2 weeks, no live yet.&quot;</li>
+</ul>
+</li>
+</ul>
+<h3>19.3 Issues table readability</h3>
+<p>The screenshot shows Status and Assignee dropdowns rendering as dark-gray-on-darker-gray — unreadable. Root cause: native <code>&lt;select&gt;</code> elements inherit no explicit color, so the OS dark theme paints them grey-on-grey when the parent has dark colors. The Issues table sets <code>color: #111827</code> on the table but the select OS UA styles take over.</p>
+<p>Fix:</p>
+<ul>
+<li>Add a shared <code>selectStyle</code> constant: <code>{ background: &quot;white&quot;, color: &quot;#111827&quot;, border: &quot;1px solid #d1d5db&quot;, padding: &quot;4px 8px&quot;, borderRadius: 4, fontSize: 12 }</code>.</li>
+<li>Apply it to <strong>all</strong> <code>&lt;select&gt;</code> elements on the Issues page (status, assignee, filter dropdowns) — and audit the other product pages for the same issue (ProductFlags resolve dropdown, ProductCustomerDetail checklist Pass/Fail).</li>
+<li>The &quot;open / in_progress / blocked / done / wontfix&quot; status select gets a colored left border per state for extra glance-ability (optional micro-polish).</li>
+</ul>
+<h3>19.4 Files to create / modify (round 4)</h3>
+<p><strong>New</strong></p>
+<ul>
+<li><code>command-center/src/components/KpiTile.tsx</code> — tile with hover-tooltip slot.</li>
+<li><code>command-center/src/lib/insights.ts</code> — computes the four tile insights + the per-line sparkline insight from current mock/real data.</li>
+</ul>
+<p><strong>Modified</strong></p>
+<ul>
+<li><code>command-center/src/pages/product/ProductHome.tsx</code> — swap inline <code>&lt;StatTile&gt;</code> with <code>&lt;KpiTile&gt;</code>, pass computed insights; add sparkline label + trend chip on the variation cards; pass insight tooltip to each card.</li>
+<li><code>command-center/src/pages/product/ProductIssues.tsx</code> — apply <code>selectStyle</code> to every <code>&lt;select&gt;</code>. Same for ProductFlags resolve action and ProductCustomerDetail checklist status select.</li>
+</ul>
+<h3>19.5 Verification</h3>
+<ul>
+<li>Hover each KPI tile → small popover with one insight appears above.</li>
+<li>Hover each Product Line card → tooltip with growth insight. Below the sparkline: &quot;Signups · last 12 weeks · ↑/→/↓ %&quot;.</li>
+<li>Issues page: every select renders white-on-dark-text, readable at a glance. Same on Flags and Customer Detail checklist.</li>
+</ul>
+<hr>
+<h2>Appendix A — Catalog of new AI agents</h2>
+<p>This is what&#39;s introduced in this PRD relative to the pre-existing AI Factory pipeline (Planner, Backend-dev, Frontend-dev, VPS-dev, Code-critic, Visual-a11y). Each new agent has its own daemon row in <code>agent_pods</code> and a registry row in <code>agent_registry</code>.</p>
+<h3>A.1 Synopsis Agent (§6.4)</h3>
+<ul>
+<li><strong>Purpose</strong>: Turn the customer&#39;s onboarding canvas into a 1-page markdown summary that the proposal then quotes from.</li>
+<li><strong>Trigger</strong>: <code>onboarding_canvas_states.status = &#39;complete&#39;</code>.</li>
+<li><strong>Inputs</strong>: <code>onboarding_canvas_states.canvas</code> JSON (before/after, modules, opportunities) + <code>companies.name</code>, <code>companies.niche</code>.</li>
+<li><strong>Outputs</strong>: <code>proposal_artifacts</code> row with <code>kind=&#39;synopsis&#39;</code>; <code>notifications</code> row of kind <code>map-ready</code> to the product_manager.</li>
+<li><strong>Edge function</strong>: <code>supabase/functions/agents-synopsis-run/index.ts</code>.</li>
+</ul>
+<h3>A.2 Pricing Agent (§6.1)</h3>
+<ul>
+<li><strong>Purpose</strong>: Author the financial section of the proposal — pricing tier, projected ROI, payback.</li>
+<li><strong>Trigger</strong>: Sanya clicks &quot;Generate proposal&quot; OR proposal_council finishes.</li>
+<li><strong>Inputs</strong>: <code>companies</code> (niche, size, region), <code>niche_templates.template</code>, <code>cleo_packages</code> price book.</li>
+<li><strong>Outputs</strong>: <code>proposal_artifacts</code> row with <code>kind=&#39;financial&#39;</code>.</li>
+<li><strong>Edge function</strong>: <code>supabase/functions/agents-pricing-run/index.ts</code>.</li>
+</ul>
+<h3>A.3 Contract Agent (§6.2)</h3>
+<ul>
+<li><strong>Purpose</strong>: Draft a SaaS contract for the customer, scoped to their niche and proposal.</li>
+<li><strong>Trigger</strong>: Sanya clicks &quot;Generate contract&quot; or proposal acceptance.</li>
+<li><strong>Inputs</strong>: <code>proposal_artifacts</code>, <code>niche_templates</code>, <code>companies</code> legal info.</li>
+<li><strong>Outputs</strong>: <code>contract_drafts</code> row (existing table, repurposed). Capabilities: create / edit / review (red-flag clauses) / version.</li>
+<li><strong>Edge function</strong>: <code>supabase/functions/agents-contract-run/index.ts</code>.</li>
+<li><strong>Reuses</strong>: existing <code>ContractEditor.tsx</code> for the editing UI.</li>
+</ul>
+<h3>A.4 QC Agent (§6.3)</h3>
+<ul>
+<li><strong>Purpose</strong>: When a tenant deploys, generate a tailored client-experience audit checklist for Sanya (not tech smoke tests).</li>
+<li><strong>Trigger</strong>: project_lifecycle stage advances to <code>deployed</code>.</li>
+<li><strong>Inputs</strong>: <code>companies.niche</code>, <code>niche_templates.completeness_checklist</code>, deployed feature list, last <code>e2e_audit_runs</code>.</li>
+<li><strong>Outputs</strong>: <code>audit_checklists</code> row (new table); marks any prior checklist for that company <code>is_current=false</code>.</li>
+<li><strong>Edge function</strong>: <code>supabase/functions/agents-qc-run/index.ts</code>.</li>
+<li><strong>Default items</strong> (§17.3): &quot;Sign up as a brand-new customer end-to-end. Does it feel obvious?&quot;, &quot;Try to break it: empty inputs, weird characters&quot;, &quot;Final gut check: would you recommend this to a friend?&quot;.</li>
+</ul>
+<h3>A.5 Triage Agent (§17.4) — NEW in v3 feedback round</h3>
+<ul>
+<li><strong>Purpose</strong>: Group incoming customer flags onto the underlying engineering issues they represent. Without this, 10 customers reporting &quot;site is slow on mobile&quot; look like 10 unrelated complaints. After triage, they roll up to 1 issue with 10 flags — sortable to the top by priority.</li>
+<li><strong>Trigger</strong>: HTTP POST <code>{ flag_id }</code> on <code>customer_flags</code> insert (DB hook in production).</li>
+<li><strong>Inputs</strong>: the new flag&#39;s <code>title</code>/<code>body</code> + recent open <code>tech_issues</code>.</li>
+<li><strong>Outputs</strong>: UPDATE <code>customer_flags.linked_issue_id</code> to point at an existing issue, OR INSERT a new <code>tech_issues</code> row + link.</li>
+<li><strong>Edge function</strong>: <code>supabase/functions/agents-triage-flag-run/index.ts</code>.</li>
+<li><strong>Mock implementation</strong>: substring-similarity matcher (no LLM) in <code>lib/mockSupabase.ts</code> for local dev.</li>
+</ul>
+<h3>A.6 Schedule-Call Agent (§18.4) — NEW in v4 feedback round</h3>
+<ul>
+<li><strong>Purpose</strong>: When the customer picks one of Sanya&#39;s offered slots, create a real Google Calendar event with a Meet link and confirm both parties.</li>
+<li><strong>Trigger</strong>: customer hits the <code>/pick/&lt;token&gt;</code> page and selects a slot (or for v1 mock: the &quot;Simulate client picks slot 1&quot; button).</li>
+<li><strong>Inputs</strong>: <code>call_slot_offers</code> row (new table) + the chosen slot index.</li>
+<li><strong>Outputs</strong>: <code>scheduled_calls</code> row (new table) with the Meet URL; two <code>outbound_emails</code> rows (<code>schedule_call_confirm</code> to customer + to Sanya).</li>
+<li><strong>Edge function</strong>: <code>supabase/functions/agents-schedule-call-confirm/index.ts</code> (plus the existing <code>agents-schedule-call</code> for offer-time work).</li>
+</ul>
+<h3>A.7 Emails Façade (§8.1, not strictly an agent but the email outbound)</h3>
+<ul>
+<li><strong>Purpose</strong>: Drain <code>outbound_emails</code> (status=<code>queued</code>), pick provider (Resend default), send, mark sent or failed.</li>
+<li><strong>Edge function</strong>: <code>supabase/functions/emails-send/index.ts</code>.</li>
+<li><strong>Templates supported</strong>: <code>schedule_call_offer</code>, <code>schedule_call_confirm</code>, <code>proposal_send</code>, <code>contract_send</code>, <code>credentials_send</code>, <code>audit_invite</code>.</li>
+</ul>
+<hr>
+<h2>Appendix B — Catalog of new tables / views / columns</h2>
+<p>Everything introduced in this PRD. All migration SQL collected in <code>migrations/002_product_view.sql</code> (and the additions tracked under each feedback section).</p>
+<h3>B.1 New tables</h3>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Purpose</th>
+<th>Section</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>customer_flags</code></td>
+<td>Customer-raised complaints. Many per customer. Triage Agent links each to a <code>tech_issues</code> row.</td>
+<td>§7.1 + §17.4 columns</td>
+</tr>
+<tr>
+<td><code>tech_issues</code></td>
+<td>Sanya-curated engineering tickets. Many flags can map to one issue. Mirrors to <code>tenant_alerts</code> on insert (trigger).</td>
+<td>§7.1</td>
+</tr>
+<tr>
+<td><code>sanya_audit_decisions</code></td>
+<td>Append-only log of approve / bugs / disapprove verdicts. References related <code>tech_issues</code> ids when decision=&#39;bugs&#39;.</td>
+<td>§7.1</td>
+</tr>
+<tr>
+<td><code>audit_checklists</code></td>
+<td>Per-account, regenerated on each redeploy. <code>items jsonb</code> carries 8–10 client-experience checks.</td>
+<td>§7.1</td>
+</tr>
+<tr>
+<td><code>outbound_emails</code></td>
+<td>Queue + log of every customer-facing email. Filled by app, drained by <code>emails-send</code> edge function.</td>
+<td>§8.1</td>
+</tr>
+<tr>
+<td><code>call_slot_offers</code></td>
+<td>Sanya&#39;s offered slots for a customer call. <code>picker_token</code> enables the public picker URL.</td>
+<td>§18.4</td>
+</tr>
+<tr>
+<td><code>scheduled_calls</code></td>
+<td>Confirmed customer calls, with Meet URL. Feeds the Calendar widget on overview.</td>
+<td>§18.4</td>
+</tr>
+</tbody></table>
+<h3>B.2 New columns on existing tables</h3>
+<table>
+<thead>
+<tr>
+<th>Table.column</th>
+<th>Type</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>customer_flags.linked_issue_id</code></td>
+<td>uuid → tech_issues</td>
+<td>Set by Triage Agent. Drives the flag↔issue rollup.</td>
+</tr>
+<tr>
+<td><code>customer_flags.triaged_at</code></td>
+<td>timestamptz</td>
+<td>When the agent processed this flag.</td>
+</tr>
+<tr>
+<td><code>customer_flags.triaged_by</code></td>
+<td>text</td>
+<td>&#39;triage_agent:v1&#39; or &#39;manual:<user_id>&#39;.</td>
+</tr>
+<tr>
+<td><code>tenant_health_snapshots.override_status</code></td>
+<td>text</td>
+<td>Manual R/Y/G override; supersedes auto-computed.</td>
+</tr>
+<tr>
+<td><code>tenant_health_snapshots.override_by</code></td>
+<td>uuid → ops_users</td>
+<td>Who set the override.</td>
+</tr>
+<tr>
+<td><code>tenant_health_snapshots.override_expires_at</code></td>
+<td>timestamptz</td>
+<td>When the override stops being honored.</td>
+</tr>
+<tr>
+<td><code>ops_users.role</code> (CHECK extended)</td>
+<td>text</td>
+<td>Adds <code>product_manager</code>, <code>tech</code>, <code>cto</code>, <code>ceo</code> to the allowed values.</td>
+</tr>
+</tbody></table>
+<h3>B.3 New views</h3>
+<table>
+<thead>
+<tr>
+<th>View</th>
+<th>Definition (summary)</th>
+<th>Used by</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>v_account_health</code></td>
+<td>Per-company red/yellow/green, computed from <code>tenant_alerts</code>, <code>customer_flags</code>, last-e2e age, runtime heartbeat. Respects active <code>tenant_health_snapshots.override_status</code>.</td>
+<td>AtRiskList, KPI tile, variation cards</td>
+</tr>
+<tr>
+<td><code>v_financial_summary</code></td>
+<td>Per-niche rollup: live_count / in_flight_count / churned_count / mrr_usd / avg_acv_usd.</td>
+<td>ProductHome KPI math + per-line cards</td>
+</tr>
+<tr>
+<td><code>v_issues_with_flag_stats</code></td>
+<td><code>tech_issues</code> augmented with <code>flag_count</code> (open flags linked to this issue), <code>customer_count</code> (distinct companies among those flags), <code>priority_score = flag_count + 2*customer_count</code>.</td>
+<td>Issues table sort + Top flagged widget</td>
+</tr>
+</tbody></table>
+<h3>B.4 niche_templates</h3>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Rename</td>
+<td><code>residential-pool-service</code> → <code>cleo-for-pools</code>.</td>
+</tr>
+<tr>
+<td>Insert</td>
+<td><code>gameday-model</code> (empty template; sample data).</td>
+</tr>
+<tr>
+<td>Insert</td>
+<td><code>real-estate-model</code> (empty template; sample data).</td>
+</tr>
+</tbody></table>
+<h3>B.5 New notification kinds (existing <code>notifications.kind</code> enum extension)</h3>
+<table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>Recipient</th>
+<th>Trigger</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>map-ready</code></td>
+<td>product_manager</td>
+<td>Synopsis Agent finishes</td>
+</tr>
+<tr>
+<td><code>integrations-ready</code></td>
+<td>product_manager</td>
+<td>tenant_runtimes hits &#39;integrations&#39;</td>
+</tr>
+<tr>
+<td><code>audit-bugs-high-priority</code></td>
+<td>tech roles + cto</td>
+<td>Sanya decision=bugs</td>
+</tr>
+<tr>
+<td><code>audit-disapproved</code></td>
+<td>cto, ceo</td>
+<td>Sanya decision=disapprove</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Appendix C — Catalog of new UI components</h2>
+<p>All new files under <code>command-center/src/</code>. Filenames in the table; module purpose in the body.</p>
+<h3>C.1 Pages (under <code>pages/product/</code>)</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>What you see</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ProductHome.tsx</code></td>
+<td>Overview: 4 KPI tiles (with hover insights) · PM widgets (audit queue / top flagged / avg time to live) · 3 product line cards (with sparkline + trend chip + hover insight) · charts row (AtRiskList / PhaseFunnel / MRR by line) · Calendar widget.</td>
+</tr>
+<tr>
+<td><code>ProductVariation.tsx</code></td>
+<td>Per-line page: Phase funnel (with per-phase tooltip descriptions) · AtRiskList scoped to this niche · 4 phase tables grouped by <code>phase1</code> / <code>phase2</code> / <code>phase3</code> / <code>live</code>. Action buttons gated per stage. Live row uses clickable counts not buttons.</td>
+</tr>
+<tr>
+<td><code>ProductCustomerDetail.tsx</code></td>
+<td>Per-customer: 11-stage stepper · 3 phase panels with gated actions (Map, Synopsis, Proposal, Schedule call, Contract, Production link, Integrations, Credentials, QC sign-off chip) · audit checklist + Approve/Bugs/Disapprove decisions · activity timeline sidebar · quick actions panel.</td>
+</tr>
+<tr>
+<td><code>ProductIssues.tsx</code></td>
+<td>Issues table sorted by <code>priority_score</code> desc. Columns: Issue · Flags · Customers · Priority · Severity · Status · Assignee (role-prefixed). Click row → modal listing linked flags from real customers.</td>
+</tr>
+<tr>
+<td><code>ProductFlags.tsx</code></td>
+<td>Per-line flags view. Severity donut + 14-day reported sparkline. Linked-issue column per flag.</td>
+</tr>
+<tr>
+<td><code>ProductSettings.tsx</code></td>
+<td>CTO-only role assignment UI. Lists every ops_users row, dropdown to change role.</td>
+</tr>
+</tbody></table>
+<h3>C.2 Shared widgets (under <code>components/</code>)</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Used by</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>KpiTile.tsx</code></td>
+<td>ProductHome</td>
+<td>Hover tooltip with one insight.</td>
+</tr>
+<tr>
+<td><code>ChartCard.tsx</code></td>
+<td>Every chart/widget</td>
+<td>&quot;?&quot; info button → &quot;What this is / What to do&quot; popover.</td>
+</tr>
+<tr>
+<td><code>AtRiskList.tsx</code></td>
+<td>ProductHome + ProductVariation</td>
+<td>Lists yellow/red customers with reasons. Replaces the donut.</td>
+</tr>
+<tr>
+<td><code>CalendarWidget.tsx</code></td>
+<td>ProductHome</td>
+<td>Next-7-days customer calls list.</td>
+</tr>
+<tr>
+<td><code>Modal.tsx</code></td>
+<td>All popups</td>
+<td>Generic overlay with Esc + click-outside + &quot;Open full page ↗&quot;.</td>
+</tr>
+<tr>
+<td><code>product-popups.tsx</code></td>
+<td>ProductVariation + Detail</td>
+<td>MapPopup, SynopsisPopup, ProposalPopup wrappers.</td>
+</tr>
+<tr>
+<td><code>ProposalDeck.tsx</code></td>
+<td>ProposalPopup</td>
+<td>8-slide deck (Cover · Challenge · What we build · Customer experience · Pricing · Timeline · Why now · Next step).</td>
+</tr>
+<tr>
+<td><code>schedule-call-popup.tsx</code></td>
+<td>ProductVariation + Detail</td>
+<td>Multi-slot offer flow.</td>
+</tr>
+</tbody></table>
+<h3>C.3 Chart components (under <code>components/charts/</code>)</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Where</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>StatusDonut.tsx</code></td>
+<td>Issue severity donut.</td>
+</tr>
+<tr>
+<td><code>PhaseFunnel.tsx</code></td>
+<td>ProductHome + ProductVariation (with custom per-phase tooltip).</td>
+</tr>
+<tr>
+<td><code>MrrByNicheBar.tsx</code></td>
+<td>ProductHome.</td>
+</tr>
+<tr>
+<td><code>Sparkline.tsx</code></td>
+<td>ProductHome variation cards + ProductFlags.</td>
+</tr>
+<tr>
+<td><code>StageStepper.tsx</code></td>
+<td>ProductCustomerDetail.</td>
+</tr>
+<tr>
+<td><code>ActivityTimeline.tsx</code></td>
+<td>ProductCustomerDetail.</td>
+</tr>
+<tr>
+<td><code>LoadingSkeleton.tsx</code></td>
+<td>Anywhere data is fetching.</td>
+</tr>
+</tbody></table>
+<h3>C.4 Libraries (under <code>lib/</code>)</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>stage-labels.ts</code></td>
+<td>Maps the existing 12 stage slugs → 3 PRD phase labels.</td>
+</tr>
+<tr>
+<td><code>stage-actions.ts</code></td>
+<td>Per-stage status label + which action buttons are enabled + prereq tooltip text. Single source of truth.</td>
+</tr>
+<tr>
+<td><code>health-score.ts</code></td>
+<td>TS wrapper around the <code>v_account_health</code> view + manual override helpers.</td>
+</tr>
+<tr>
+<td><code>insights.ts</code></td>
+<td>Computes the 4 KPI tile insights and per-line growth insight from current data.</td>
+</tr>
+<tr>
+<td><code>seeds.ts</code></td>
+<td>Local-only fixtures: 19 fake companies across the 3 lines + journey events + flags + issues + decisions + checklists + scheduled calls.</td>
+</tr>
+<tr>
+<td><code>mockSupabase.ts</code></td>
+<td>The fake Supabase client. Singleton from <code>factorySupabase.ts</code>. Backed by <code>localStorage</code>.</td>
+</tr>
+<tr>
+<td><code>factorySupabase.ts</code></td>
+<td>Env-gated dispatch between mock and real client. Exports <code>isMockBackend()</code> + <code>resetMockDB()</code>.</td>
+</tr>
+<tr>
+<td><code>ui-styles.ts</code></td>
+<td>Shared <code>selectStyle</code> / <code>inputStyle</code> so native form controls render readably in the dark shell.</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>12. Open questions to resolve before / during build</h2>
+<ul>
+<li><strong>Email provider</strong> — Resend default unless Sanya/V picks otherwise.</li>
+<li><strong>Financial source-of-truth</strong> — does CLEO&#39;s <code>cleo_packages.monthly_usd</code> already capture all variations&#39; pricing, or do we need a separate price book per niche?</li>
+<li><strong>Customer complaint intake</strong> — how do complaints reach <code>customer_flags</code>? From the existing <code>tenant_alerts</code>? From inbound emails? Manual entry by Sanya? Phase 2 question; v1 supports manual + tenant_alert mirror.</li>
+<li><strong>Slack mentions</strong> — assumes <code>ops_users.slack_user_id</code> is populated for Mitanshi/Adam/V/Ouadie. Will need a one-time setup step.</li>
+<li><strong>Real Estate / Gameday templates</strong> — <code>niche_templates.template</code> is empty for the new niches. Until populated, those product cards show &quot;coming soon&quot; instead of customer rows.</li>
+<li><strong>Schedule-call mechanism</strong> — pure email-link to a Calendly/Cal.com URL stored on <code>ops_users</code> row, vs. an embedded scheduler? PRD assumes link-out for v1.</li>
+<li><strong>Audit-by-Sanya stage</strong> — currently invented as a synthetic stage <code>sanya-audit</code>. Need to confirm no existing stage covers this; if <code>awaiting-approval</code> already does, reuse instead of adding.</li>
+</ul>
+
+  </div>
+</body>
+</html>
