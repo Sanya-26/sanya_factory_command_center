@@ -3,9 +3,11 @@
 // role=product_manager → Product sidebar (variations + Issues + Settings)
 // other roles          → existing Cleo + AI Factory sidebar
 
+import { useState } from "react";
 import type { Route } from "./route";
 import { navigate } from "./route";
 import { isMockBackend, resetMockDB } from "../lib/factorySupabase";
+import { RaiseToCeoPopup } from "../components/RaiseToCeoPopup";
 
 interface SectionDef {
   id: string;
@@ -44,6 +46,7 @@ const TECH_DEPARTMENTS: DeptDef[] = [
       { id: "tool-registry", label: "Tool registry" },
       { id: "build-agents", label: "Build agents" },
       { id: "tenants", label: "Tenants" },
+      { id: "project-management", label: "Project management" },
       { id: "settings", label: "Settings" },
     ],
   },
@@ -59,6 +62,7 @@ const PRODUCT_DEPARTMENTS: DeptDef[] = [
       { id: "cleo-for-pools", label: "· Cleo for Pools" },
       { id: "gameday-model", label: "· Gameday Model" },
       { id: "real-estate-model", label: "· Real Estate Model" },
+      { id: "team", label: "Team" },
       { id: "issues", label: "Issues" },
       { id: "settings", label: "Settings" },
     ],
@@ -74,6 +78,7 @@ const CEO_DEPARTMENTS: DeptDef[] = [
       { id: "home", label: "Main dashboard" },
       { id: "contracts", label: "Contracts" },
       { id: "discounts", label: "Discount approvals" },
+      { id: "escalations", label: "Escalations from Product" },
       { id: "wins", label: "Wins feed" },
       { id: "strategic", label: "Strategic comparison" },
       { id: "cash", label: "Cash & people" },
@@ -86,25 +91,40 @@ export function Sidebar({
   route,
   email,
   role,
+  userId,
   onSignOut,
 }: {
   route: Route;
   onNavigate: (r: Route) => void;
   email: string;
   role: string;
+  userId: string;
   onSignOut: () => void;
 }): JSX.Element {
+  const [raiseOpen, setRaiseOpen] = useState(false);
+  // Sidebar follows the current view: route.dept first, role as default for unknown routes.
   const departments =
+    route.dept === "ceo" ? CEO_DEPARTMENTS :
+    route.dept === "product" ? PRODUCT_DEPARTMENTS :
     role === "product_manager" ? PRODUCT_DEPARTMENTS :
     role === "ceo" ? CEO_DEPARTMENTS :
     TECH_DEPARTMENTS;
+  const viewLabel =
+    route.dept === "ceo" ? "Executive" :
+    route.dept === "product" ? "Product" :
+    role === "product_manager" ? "Product" :
+    role === "ceo" ? "Executive" :
+    "Factory";
+  // Only show Raise-to-CEO from Sanya's own views, not when she's viewing the CEO surface.
+  const showRaiseButton = role === "product_manager" && route.dept !== "ceo";
   return (
+    <>
     <aside className="shell-sidebar">
       <div className="shell-sidebar-brand">
         <div className="shell-sidebar-brand-mark">A</div>
         <div className="shell-sidebar-brand-text">
           <strong>AUBOS</strong>
-          <span>{role === "product_manager" ? "Product" : role === "ceo" ? "Executive" : "Factory"}</span>
+          <span>{viewLabel}</span>
         </div>
       </div>
 
@@ -134,6 +154,30 @@ export function Sidebar({
       </nav>
 
       <div className="shell-sidebar-footer">
+        {showRaiseButton ? (
+          <button
+            type="button"
+            onClick={() => setRaiseOpen(true)}
+            style={{
+              background: "#7c3aed",
+              color: "white",
+              border: "none",
+              borderRadius: 6,
+              padding: "8px 10px",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+              marginBottom: 8,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              justifyContent: "center",
+            }}
+            title="Send Ouadie something that needs his decision"
+          >
+            🟣 Raise to CEO
+          </button>
+        ) : null}
         {isMockBackend() ? (
           <div
             style={{
@@ -180,5 +224,13 @@ export function Sidebar({
         </button>
       </div>
     </aside>
+    {showRaiseButton ? (
+      <RaiseToCeoPopup
+        open={raiseOpen}
+        onClose={() => setRaiseOpen(false)}
+        userId={userId}
+      />
+    ) : null}
+    </>
   );
 }

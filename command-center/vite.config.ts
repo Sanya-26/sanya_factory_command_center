@@ -49,5 +49,19 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: false,
+    proxy: {
+      '/api/monday': {
+        target: 'https://api.monday.com/v2',
+        changeOrigin: true,
+        rewrite: (path) => '',
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq) => {
+            const token = process.env.VITE_MONDAY_API_KEY ?? '';
+            proxyReq.setHeader('Authorization', `Bearer ${token}`);
+            proxyReq.setHeader('Content-Type', 'application/json');
+          });
+        },
+      },
+    },
   },
 });

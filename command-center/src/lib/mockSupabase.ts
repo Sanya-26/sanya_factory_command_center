@@ -6,6 +6,7 @@
 // localStorage on every write. Safe by construction: no network calls.
 
 import { INITIAL_DB, SEEDED_USER_ID, SEEDED_USER_EMAIL } from "./seeds";
+import { computeEngineerCards, type TechIssue, type OpsUser } from "./team-data";
 
 type Row = Record<string, unknown>;
 type Table = Row[];
@@ -171,11 +172,19 @@ function computeCeoContractsPending(): Row[] {
   });
 }
 
+function computeTeamWorkload(): Row[] {
+  // Round-6 §22. Surfaces engineer-first state across tech_issues for the Team page.
+  const issues = (DB.tech_issues ?? []) as unknown as TechIssue[];
+  const users = (DB.ops_users ?? []) as unknown as OpsUser[];
+  return computeEngineerCards(issues, users) as unknown as Row[];
+}
+
 function getTableRows(table: string): Row[] {
   if (table === "v_account_health") return computeAccountHealth();
   if (table === "v_financial_summary") return computeFinancialSummary();
   if (table === "v_issues_with_flag_stats") return computeIssuesWithFlagStats();
   if (table === "v_ceo_contracts_pending") return computeCeoContractsPending();
+  if (table === "v_team_workload") return computeTeamWorkload();
   return DB[table] ?? (DB[table] = []);
 }
 

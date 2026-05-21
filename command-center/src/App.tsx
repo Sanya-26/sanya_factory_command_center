@@ -26,17 +26,20 @@ import { TenantsPage } from "./pages/factory/Tenants";
 import TenantAdminPanel from "./pages/TenantAdminPanel";
 import { FactorySettingsPage } from "./pages/factory/FactorySettings";
 import { ToolRegistryPage } from "./pages/factory/ToolRegistry";
+import { ProjectManagementPage } from "./pages/factory/ProjectManagement";
 import { PipelineMapPage } from "./pages/PipelineMap";
 import { CalendarOAuthCallback } from "./pages/factory/CalendarOAuthCallback";
 import { ProductHomePage } from "./pages/product/ProductHome";
 import { ProductVariationPage } from "./pages/product/ProductVariation";
 import { ProductCustomerDetailPage } from "./pages/product/ProductCustomerDetail";
 import { ProductIssuesPage } from "./pages/product/ProductIssues";
+import { ProductTeamPage } from "./pages/product/ProductTeam";
 import { ProductSettingsPage } from "./pages/product/ProductSettings";
 import { ProductFlagsPage } from "./pages/product/ProductFlags";
 import { CeoHomePage } from "./pages/ceo/CeoHome";
 import { CeoContractsPage } from "./pages/ceo/CeoContracts";
 import { CeoDiscountsPage } from "./pages/ceo/CeoDiscounts";
+import { CeoEscalationsPage } from "./pages/ceo/CeoEscalations";
 import { CeoWinsPage } from "./pages/ceo/CeoWins";
 import { CeoStrategicPage } from "./pages/ceo/CeoStrategic";
 import { CeoCashPage } from "./pages/ceo/CeoCash";
@@ -157,6 +160,7 @@ export function App(): JSX.Element {
     <Shell
       email={auth.email}
       role={auth.role}
+      userId={auth.userId}
       route={currentRoute}
       onNavigate={(r) => navigate(r)}
       onSignOut={() => void handleSignOut()}
@@ -180,6 +184,7 @@ function PageRouter({
     if (route.section === "home") return <CeoHomePage userId={userId} />;
     if (route.section === "contracts") return <CeoContractsPage userId={userId} />;
     if (route.section === "discounts") return <CeoDiscountsPage userId={userId} />;
+    if (route.section === "escalations") return <CeoEscalationsPage userId={userId} />;
     if (route.section === "wins") return <CeoWinsPage />;
     if (route.section === "strategic") return <CeoStrategicPage />;
     if (route.section === "cash") return <CeoCashPage />;
@@ -189,6 +194,7 @@ function PageRouter({
   if (route.dept === "product") {
     if (route.section === "home") return <ProductHomePage />;
     if (route.section === "issues") return <ProductIssuesPage userId={userId} />;
+    if (route.section === "team") return <ProductTeamPage />;
     if (route.section === "settings") return <ProductSettingsPage userRole={role} />;
     // /product/<niche>[/customer/<id>] or /product/<niche>/flags
     const niche = route.section;
@@ -212,6 +218,7 @@ function PageRouter({
     if (route.section === "pipeline") return <PipelineMapPage dept="factory" />;
     if (route.section === "tool-registry") return <ToolRegistryPage route={route} />;
     if (route.section === "build-agents") return <BuildAgentsPage route={route} />;
+    if (route.section === "project-management") return <ProjectManagementPage />;
     if (route.section === "tenants") {
       if (route.id) return <TenantAdminPanel tenantSlug={route.id} />;
       return <TenantsPage />;

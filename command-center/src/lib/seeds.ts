@@ -378,6 +378,78 @@ tech_issues.push({
   closed_at: null,
 });
 
+// ─── Team Management seeds (Round-6) — one stuck + one stale + one never-started + 2 recently-closed ───
+tech_issues.push({
+  id: "ti-team-blocked-01",
+  company_id: "c-pool-live-02",
+  raised_by: SANYA_ID,
+  assignee_id: MITANSHI_ID,
+  title: "Stripe webhook signature mismatch on prod",
+  description: "Blocked on Stripe support replying about the signing secret rotation.",
+  severity: "high",
+  priority: "high",
+  status: "blocked",
+  created_at: ago(6),
+  updated_at: ago(2),
+  closed_at: null,
+});
+tech_issues.push({
+  id: "ti-team-stale-01",
+  company_id: "c-pool-live-03",
+  raised_by: SANYA_ID,
+  assignee_id: ADAM_ID,
+  title: "Migrate quote calculator to new pricing engine",
+  description: "Started last week; no update since.",
+  severity: "medium",
+  priority: "normal",
+  status: "in_progress",
+  created_at: ago(10),
+  updated_at: ago(7),
+  closed_at: null,
+});
+tech_issues.push({
+  id: "ti-team-neverstarted-01",
+  company_id: "c-realestate-sign-02",
+  raised_by: SANYA_ID,
+  assignee_id: V_ID,
+  title: "Pick a vector DB for listing similarity search",
+  description: "Need a decision: pgvector vs. Pinecone vs. Qdrant. V to own.",
+  severity: "medium",
+  priority: "normal",
+  status: "open",
+  created_at: ago(9),
+  updated_at: ago(9),
+  closed_at: null,
+});
+tech_issues.push({
+  id: "ti-team-done-recent-01",
+  company_id: "c-pool-live-01",
+  raised_by: SANYA_ID,
+  assignee_id: MITANSHI_ID,
+  title: "Fix favicon flashing on first paint",
+  description: "Tiny CSP / preload fix.",
+  severity: "low",
+  priority: "normal",
+  status: "done",
+  created_at: ago(8),
+  updated_at: ago(2),
+  closed_at: ago(2),
+});
+tech_issues.push({
+  id: "ti-team-done-recent-02",
+  company_id: "c-game-live-01",
+  raised_by: SANYA_ID,
+  assignee_id: ADAM_ID,
+  title: "Roster import — handle blank middle names",
+  description: "CSV import crashed on optional middle-name column.",
+  severity: "medium",
+  priority: "normal",
+  status: "done",
+  created_at: ago(11),
+  updated_at: ago(4),
+  closed_at: ago(4),
+});
+
 // Cross-customer flags pointing at the same underlying issues
 const extraFlags: any[] = [
   { company_id: "c-pool-live-01", linked_issue_id: "ti-double-submit", severity: "medium", title: "Lead form sometimes double-submits", daysAgo: 3, source: "support_email" },
@@ -613,6 +685,55 @@ const scheduled_calls = [
 
 const call_slot_offers: any[] = [];
 
+// CEO escalations from Sanya
+const ceo_escalations = [
+  {
+    id: "esc-1",
+    raised_by: SANYA_ID,
+    title: "Pacific Pools wants 35% off — above policy",
+    body: "Owner is well-known in the niche and pledged 3 written referrals. Our policy ceiling is 25% off list. Asking for an exception this once.",
+    category: "contract",
+    urgency: "high",
+    related_company_id: "c-pool-sign-03",
+    status: "open",
+    decision: null,
+    decision_notes: null,
+    decided_by: null,
+    decided_at: null,
+    created_at: ago(2),
+  },
+  {
+    id: "esc-2",
+    raised_by: SANYA_ID,
+    title: "Should we sunset Gameday Model?",
+    body: "60 days since launch, 1 live customer, 1 in audit, 2 in proposal. Growth is flat. Killing the line frees Mitanshi for Real Estate.",
+    category: "strategic",
+    urgency: "normal",
+    related_company_id: null,
+    status: "open",
+    decision: null,
+    decision_notes: null,
+    decided_by: null,
+    decided_at: null,
+    created_at: ago(5),
+  },
+  {
+    id: "esc-3",
+    raised_by: SANYA_ID,
+    title: "Hire a second designer for Real Estate launch?",
+    body: "Real Estate line ships in 4 weeks. Current designer is already at 110% utilization. Mid-level @ ~$150k or contract @ $8k/mo for 3 months.",
+    category: "hire",
+    urgency: "normal",
+    related_company_id: null,
+    status: "acknowledged",
+    decision: null,
+    decision_notes: null,
+    decided_by: OUADIE_ID,
+    decided_at: ago(1),
+    created_at: ago(8),
+  },
+];
+
 export const INITIAL_DB = {
   companies,
   ops_users: opsUsers,
@@ -630,6 +751,7 @@ export const INITIAL_DB = {
   scheduled_calls,
   call_slot_offers,
   ceo_kpi_inputs,
+  ceo_escalations,
 };
 
 export const SEEDED_USER_ID = SANYA_ID;

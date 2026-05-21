@@ -7,6 +7,7 @@ import { KpiTile } from "../../components/KpiTile";
 import { ChartCard } from "../../components/ChartCard";
 import { MockBadge } from "../../components/MockBadge";
 import { CeoDecisionQueue } from "../../components/CeoDecisionQueue";
+import { CeoEscalationQueue } from "../../components/CeoEscalationQueue";
 import { WinsFeed } from "../../components/WinsFeed";
 import { StrategicLineCard } from "../../components/StrategicLineCard";
 import { computeNorthStar, computeStrategic, kpiInsight, type KpiInputs, type StrategicCardData } from "../../lib/ceo-data";
@@ -182,7 +183,16 @@ export function CeoHomePage({ userId }: { userId: string }): JSX.Element {
 
       {/* Main grid: Decision queue (2fr) + right rail (1fr) */}
       <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16 }}>
-        <CeoDecisionQueue userId={userId} onChange={() => setRefresh((t) => t + 1)} />
+        <div style={{ display: "grid", gap: 16, alignContent: "start" }}>
+          <CeoDecisionQueue userId={userId} onChange={() => setRefresh((t) => t + 1)} />
+          <ChartCard
+            title="Raised by Product"
+            whatThisIs="Items Sanya has raised for your decision — beyond auto-routed contracts and discounts."
+            whatToDo="Open each, decide or acknowledge. Notes go back to Sanya as a notification."
+          >
+            <CeoEscalationQueue userId={userId} onRefresh={() => setRefresh((t) => t + 1)} />
+          </ChartCard>
+        </div>
         <div style={{ display: "grid", gap: 16, alignContent: "start" }}>
           <ChartCard
             title="Wins · last 30 days"

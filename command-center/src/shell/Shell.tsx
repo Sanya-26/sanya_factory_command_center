@@ -8,6 +8,7 @@ import { NotificationBell } from "../components/NotificationBell";
 export function Shell({
   email,
   role,
+  userId,
   route,
   onNavigate,
   onSignOut,
@@ -16,6 +17,7 @@ export function Shell({
 }: {
   email: string;
   role: string;
+  userId: string;
   route: Route;
   onNavigate: (r: Route) => void;
   onSignOut: () => void;
@@ -29,6 +31,7 @@ export function Shell({
         onNavigate={onNavigate}
         email={email}
         role={role}
+        userId={userId}
         onSignOut={onSignOut}
       />
       <div className="shell-main">

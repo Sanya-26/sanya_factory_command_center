@@ -10,6 +10,7 @@ import { StageStepper } from "../../components/charts/StageStepper";
 import { ActivityTimeline } from "../../components/charts/ActivityTimeline";
 import { MapPopup, SynopsisPopup, ProposalPopup } from "../../components/product-popups";
 import { ScheduleCallPopup } from "../../components/schedule-call-popup";
+import { RaiseToCeoPopup } from "../../components/RaiseToCeoPopup";
 import { selectStyle } from "../../lib/ui-styles";
 
 interface Company {
@@ -60,6 +61,7 @@ export function ProductCustomerDetailPage({
   const [decisionState, setDecisionState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [decisionError, setDecisionError] = useState<string | null>(null);
   const [popup, setPopup] = useState<PopupKind>(null);
+  const [raiseOpen, setRaiseOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,6 +111,14 @@ export function ProductCustomerDetailPage({
           <span style={{ width: 10, height: 10, borderRadius: 999, background: STATUS_COLOR[health] }} />
           {health.toUpperCase()}
         </span>
+        <button
+          type="button"
+          onClick={() => setRaiseOpen(true)}
+          style={{ padding: "6px 12px", background: "#7c3aed", color: "white", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+          title="Send Ouadie something about this customer that needs his decision"
+        >
+          🟣 Raise to CEO →
+        </button>
       </header>
 
       <StageStepper currentStage={stage?.stage_slug} />
@@ -240,6 +250,13 @@ export function ProductCustomerDetailPage({
       <SynopsisPopup open={popup === "synopsis"} onClose={() => setPopup(null)} companyId={companyId} companyName={company?.name ?? ""} fullPageHref={`#product/${niche}/customer/${companyId}/synopsis`} />
       <ProposalPopup open={popup === "proposal"} onClose={() => setPopup(null)} companyId={companyId} companyName={company?.name ?? ""} fullPageHref={`#product/${niche}/customer/${companyId}/proposal`} />
       <ScheduleCallPopup open={popup === "schedule"} onClose={() => setPopup(null)} companyId={companyId} companyName={company?.name ?? ""} customerEmail={company?.email ?? null} />
+      <RaiseToCeoPopup
+        open={raiseOpen}
+        onClose={() => setRaiseOpen(false)}
+        userId={userId}
+        presetCompanyId={companyId}
+        presetCategory="customer"
+      />
     </div>
   );
 }
