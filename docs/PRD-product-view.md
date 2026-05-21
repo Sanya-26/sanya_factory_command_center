@@ -893,6 +893,62 @@ Right-side overlay (Esc + overlay-click to close). Header shows name + role + su
 
 ---
 
+## 23. Round-7 — Project task tracking via tech_issues
+
+### 23.1 Context
+Initially, §22 Team Management planned to integrate Monday.com board data. After your tech team confirmed they're building in-house project management, we pivoted to use the existing **`tech_issues`** table instead. This is now the single source of truth for project tasks across Product and Tech views.
+
+### 23.2 Changes to §22
+
+The **Projects & tasks** section (collapsible) in `/#product/team` now displays `tech_issues` with:
+- **Filters**: Project (company_id) · Assignee · Status · Priority
+- **Progress counts**: Open · In progress · Blocked · Done (displayed in the collapsed header)
+- **Task table**: Name · Assignee · Status (color pill) · Priority (color pill) · Age (days)
+- **No Monday.com dependency** — pure in-house data.
+
+### 23.3 Tech view — Project Management page
+
+`/#factory/project-management` now shows:
+- **5 KPI tiles**: Total tasks · Open · In progress · Blocked (red) · Done
+- **ProjectTaskSection component** (full list, expanded) — same filters and table as Product view
+
+### 23.4 Files changed
+
+**New**
+- `command-center/src/components/ProjectTaskSection.tsx` — filterable task table component
+
+**Modified**
+- `command-center/src/pages/product/ProductTeam.tsx` — swapped `MondayBoardSection` for `ProjectTaskSection`
+- `command-center/src/pages/factory/ProjectManagement.tsx` — rewrote to use `tech_issues` instead of Monday API
+- `command-center/src/pages/product/ProductHome.tsx` — removed `MondayBoardSummaryWidget`
+
+**Removed**
+- Monday.com integration files (no longer needed):
+  - `command-center/src/lib/mondayClient.ts`
+  - `command-center/src/lib/monday-data.ts`
+  - `command-center/src/components/MondayBoardSection.tsx`
+  - `command-center/src/components/MondayBoardSummaryWidget.tsx`
+
+### 23.5 Data schema (no changes)
+
+Still uses `tech_issues` table:
+- Columns: `id`, `company_id`, `raised_by`, `assignee_id`, `title`, `description`, `severity`, **`priority`** (normal|high|urgent), **`status`** (open|in_progress|blocked|done|wontfix), `created_at`, `updated_at`, `closed_at`
+- No new tables or columns required.
+
+### 23.6 Verification
+1. Open `/#product/team` → "Projects & tasks" section appears (collapsed); click to expand.
+2. Expand section → 4 filter dropdowns (Project, Assignee, Status, Priority) + task table.
+3. Filter by status='blocked' → see only blocked tasks; table updates instantly.
+4. Open `/#factory/project-management` → 5 KPI tiles + full task list (expanded by default).
+5. `tsc --noEmit` exit 0.
+
+### 23.7 Out of scope (v1)
+- Two-way sync between `tech_issues` and your tech team's PM tool (sync layer separate ticket).
+- Real-time updates (page load + manual refresh sufficient for now).
+- Task editing from inside these views (assignment already works via ProductIssues page).
+
+---
+
 ## Appendix A — Catalog of new AI agents
 
 This is what's introduced in this PRD relative to the pre-existing AI Factory pipeline (Planner, Backend-dev, Frontend-dev, VPS-dev, Code-critic, Visual-a11y). Each new agent has its own daemon row in `agent_pods` and a registry row in `agent_registry`.
