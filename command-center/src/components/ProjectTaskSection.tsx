@@ -272,13 +272,13 @@ export function ProjectTaskSection({ issues, users }: ProjectTaskSectionProps) {
                       gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr',
                       gap: 0,
                       padding: '10px 12px',
-                      borderTop: i === 0 ? 'none' : '1px solid #f3f4f6',
-                      background: 'transparent',
+                      borderTop: i === 0 ? 'none' : '1px solid #e5e7eb',
+                      background: i % 2 === 0 ? '#f9fafb' : 'transparent',
                       fontSize: 13,
                       alignItems: 'center',
                     }}
                   >
-                    <div style={{ color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div style={{ color: '#111827', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {issue.title}
                     </div>
                     <div style={{ color: '#6b7280', fontSize: 12 }}>
