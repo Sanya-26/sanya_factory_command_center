@@ -7,7 +7,7 @@ import { KpiTile } from "../../components/KpiTile";
 import { ChartCard } from "../../components/ChartCard";
 import { EngineerCard } from "../../components/EngineerCard";
 import { EngineerQueueDrawer } from "../../components/EngineerQueueDrawer";
-import { MondayBoardSection } from "../../components/MondayBoardSection";
+import { ProjectTaskSection } from "../../components/ProjectTaskSection";
 import {
   computeEngineerCards,
   computeTeamStuckList,
@@ -31,7 +31,6 @@ import {
 } from "recharts";
 
 const ENGINEER_LINE_COLORS = ["#2563eb", "#10b981", "#7c3aed", "#f59e0b", "#ef4444"];
-const MONDAY_BOARD_ID = (import.meta.env.VITE_MONDAY_BOARD_ID as string | undefined) ?? "18403740335";
 
 export function ProductTeamPage(): JSX.Element {
   const [issues, setIssues] = useState<TechIssue[]>([]);
@@ -227,7 +226,7 @@ export function ProductTeamPage(): JSX.Element {
         </ChartCard>
       </section>
 
-      <MondayBoardSection boardId={MONDAY_BOARD_ID} expanded={false} />
+      <ProjectTaskSection issues={issues} users={users} />
 
       <EngineerQueueDrawer
         open={drawer !== null}

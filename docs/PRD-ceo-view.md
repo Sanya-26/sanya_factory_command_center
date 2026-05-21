@@ -253,6 +253,96 @@ join public.companies c on c.id = cd.company_id;
 7. **Strategic cards**: each of the 3 lines shows a recommendation chip with a sensible value given the seeded data.
 8. **Board snapshot**: clicking the header button opens the 8-slide deck modal. "Export PDF" produces `board-snapshot-{YYYY-MM}.pdf` on the Desktop using the existing render pipeline.
 
+## 8a. Round-5 feedback — Product → CEO escalations + Editorial board snapshot
+
+Captured from Sanya's walk-through of the CEO view.
+
+### 8a.1 Product → CEO escalations (new channel)
+
+Sanya needs a clean way to send Ouadie anything that needs his decision beyond the auto-routed contract / discount / audit-disapprove flows. Examples: customer pricing exceptions, strategic line questions, hiring asks, vendor decisions.
+
+**Data model** (mock auto-creates on first insert):
+
+```sql
+create table public.ceo_escalations (
+  id uuid primary key default gen_random_uuid(),
+  raised_by uuid not null references public.ops_users(user_id),
+  title text not null,
+  body text,
+  category text not null check (category in ('customer','contract','strategic','budget','hire','vendor','other')),
+  urgency text not null default 'normal' check (urgency in ('low','normal','high','urgent')),
+  related_company_id uuid references public.companies(id),
+  status text not null default 'open' check (status in ('open','acknowledged','decided','deferred','rejected')),
+  decision text,
+  decision_notes text,
+  decided_by uuid references public.ops_users(user_id),
+  decided_at timestamptz,
+  created_at timestamptz not null default now()
+);
+```
+
+**Sanya's entry points** (both):
+- **Sidebar footer button** on the Product view — always-visible "🟣 Raise to CEO" → opens `<RaiseToCeoPopup>`.
+- **Contextual button** on `ProductCustomerDetail` header → same popup pre-filled with `related_company_id` + `category='customer'`.
+
+**`<RaiseToCeoPopup>`** — form fields: category (customer/contract/strategic/budget/hire/vendor/other), urgency (low/normal/high/urgent), title (80 chars max), body, optional company picker. Submit INSERTs `ceo_escalations` with status='open' + queues `kind='ceo-escalation-raised'` notification to Ouadie.
+
+**CEO view — new "Raised by Product" section** on `/#ceo/home`, inserted between the Decision Queue and the Wins feed:
+- Lists `ceo_escalations` with status in ('open','acknowledged'), sorted by urgency desc then age desc.
+- Each row: urgency dot · category badge · title · age · 80-char summary · "Open →" button.
+- Click "Open →" opens `<EscalationDecisionModal>` with the full body + customer link + 4 decision controls:
+  - **Acknowledge** (status='acknowledged' — no commitment yet)
+  - **Approve** (status='decided', decision='approved', optional notes)
+  - **Reject** (status='rejected', notes required)
+  - **Defer** (status='deferred', optional notes)
+- Each decision writes back to `ceo_escalations` and notifies Sanya via `kind='escalation-decided'`.
+
+**Dedicated page** `/#ceo/escalations` — full history filterable by category + status. New entry in CEO sidebar between "Discount approvals" and "Wins feed".
+
+### 8a.2 Premium Board Snapshot — Editorial redesign
+
+The previous deck looked underbuilt. Replaced the body of `BoardSnapshotDeck.tsx` with an editorial aesthetic (NYT / FT pitch deck reference look).
+
+**Design principles**
+- **Fixed 16:9 aspect ratio** per slide via `aspect-ratio: 16/9` on the slide frame.
+- **Generous whitespace** — 76px top / 64px sides padding.
+- **Serif headings** at ~48pt; body in the existing Geist sans.
+- **One accent color per slide** — restrained palette: deep slate, claret, forest, navy, violet, amber, teal, graphite.
+- **Huge stats** — headline numbers at ~60pt serif; sub-labels at small-caps 10pt letter-spaced 3px.
+- **Slide chrome** — tiny section label top-left (uppercase small caps), AUBOS mark bottom-left, page number "03 / 08" bottom-right; hairline border on the frame.
+- **Charts removed from stat slides** — pure typography.
+
+**Per-slide redesign**
+1. **Cover** — full-bleed deep slate background. Tiny "AUBOS · Operating review" tag · serif "Board Snapshot." headline · thin amber divider · italic month label · "Prepared by Ouadie" small caps.
+2. **Headline numbers** — white background. 2×2 grid of `Statline` blocks (label small caps · 60pt serif value · italic sub-sentence). MRR / Live customers / Runway · MOCK / MoM growth · MOCK.
+3. **Customers won** — list rows: serif name (22pt) + niche small caps · big monthly $ on the right in accent color. Hairline row separators.
+4. **Customers at risk** — list with a claret left border per row. Italic reason underneath the customer name. Empty state "No accounts in yellow or red this month."
+5. **Per-product-line scorecard** — 3 columns. Serif line name (~22pt) · 3 `Metric` rows (MRR / Live / 30d growth · MOCK) · accent-colored "→ Invest / Hold / Reassess" line at the bottom. Decision is computed: > $3k MRR → Invest, > $0 → Hold, else Reassess.
+6. **Cash & burn** — 2×2 grid of `Statline` blocks (Headcount / Payroll / Total burn / Runway, all MOCK). Below: italic list of open requisitions with manager attribution.
+7. **Strategic asks** — three serif pull-quotes (22pt italic), each attributed to a product line in small caps.
+8. **Next 30 days** — three numbered commitments (`01 02 03` in italic serif), each as a 22pt serif sentence with a precise verb-led commitment.
+
+**Presentation mode** (new). On the embedded deck, a "▶ Present" button switches to full-viewport mode: dark background, slide centered at `min(96vw, calc(96vh * 16 / 9))`, chrome hidden. Arrow keys / space / PageDown advance; Escape exits. Top-right "Exit (Esc)" button as fallback.
+
+**Files**
+- New: `components/RaiseToCeoPopup.tsx`, `components/EscalationDecisionModal.tsx`, `components/CeoEscalationQueue.tsx`, `pages/ceo/CeoEscalations.tsx`.
+- Modified: `shell/Sidebar.tsx` (Raise-to-CEO footer button when role=product_manager; Escalations section in CEO sidebar), `shell/Shell.tsx` + `App.tsx` (pass userId through; route `#ceo/escalations`), `pages/product/ProductCustomerDetail.tsx` (header contextual button), `pages/ceo/CeoHome.tsx` (insert Escalations section between Decision Queue and Wins), `components/BoardSnapshotDeck.tsx` (full editorial rewrite + present mode), `lib/seeds.ts` (3 example escalations).
+
+**Seeded escalations**
+1. "Pacific Pools wants 35% off — above policy" · category=contract · urgency=high · related=Pacific Pools · raised 2d ago
+2. "Should we sunset Gameday Model? Only 1 live in 60d." · category=strategic · urgency=normal · raised 5d ago
+3. "Hire a second designer for Real Estate launch?" · category=hire · urgency=normal · status=acknowledged · raised 8d ago
+
+### 8a.3 Verification (round-5)
+- As Sanya (`role='product_manager'`): footer "🟣 Raise to CEO" appears in the sidebar; clicking opens the popup.
+- Open Pacific Pools customer detail → header shows "🟣 Raise to CEO →" button; opening it pre-fills category=customer + related_company_id.
+- Submit a new escalation → row inserted; notification to Ouadie.
+- As Ouadie (`role='ceo'`): `/#ceo/home` shows a new "Raised by Product" section between Decision Queue and Wins. Sidebar lists "Escalations from Product".
+- Click an item → `<EscalationDecisionModal>` opens with body + customer link + 4 decision buttons.
+- Approve with notes → escalation moves to history; Sanya receives `escalation-decided` notification.
+- `/#ceo/escalations` shows the full filterable history with status + category dropdowns.
+- Open Board Snapshot (modal on CeoHome or `/#ceo/board` full-page): editorial layout — fixed 16:9 frame, serif headings, big stats, slide chrome ("01 / 08", AUBOS mark, section label). "▶ Present" → full-viewport; arrow keys / space advance; Escape exits.
+
 ## 9. Out of scope (v1)
 - Real Brex / QuickBooks / Stripe ingest for burn / cash / MRR. We use `ceo_kpi_inputs` editable in `/#ceo/cash`.
 - Real e-signature provider (DocuSign etc.) for the "Sign" button. v1 just flips `ceo_signed_at` and notifies — the contract pdf+signature panel is a follow-up.

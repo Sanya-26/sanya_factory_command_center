@@ -21,7 +21,6 @@ import { ChartCard } from "../../components/ChartCard";
 import { AtRiskList } from "../../components/AtRiskList";
 import { CalendarWidget } from "../../components/CalendarWidget";
 import { KpiTile } from "../../components/KpiTile";
-import { MondayBoardSummaryWidget } from "../../components/MondayBoardSummaryWidget";
 import {
   overallHealthInsight,
   mrrInsight,
@@ -263,12 +262,6 @@ export function ProductHomePage(): JSX.Element {
 
       {/* PM widgets (moved above product lines per round-3 feedback) */}
       <PmWidgets />
-
-      {/* Monday board summary */}
-      <section>
-        <h2 style={{ marginBottom: 12, fontSize: 16 }}>Monday sprints</h2>
-        <MondayBoardSummaryWidget boardId="18403740335" />
-      </section>
 
       {/* Product lines */}
       <section>

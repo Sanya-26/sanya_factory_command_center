@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>PRD — CEO View (Ouadie) in command-center</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: white; color: #0f172a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 11.5pt; line-height: 1.55; }
+  .page { max-width: 880px; margin: 0 auto; padding: 32px 48px 80px; }
+  h1 { font-size: 26pt; margin-top: 28pt; border-bottom: 2px solid #0f172a; padding-bottom: 6pt; }
+  h2 { font-size: 18pt; margin-top: 22pt; color: #0f172a; border-bottom: 1px solid #e5e7eb; padding-bottom: 4pt; font-family: Georgia, "Times New Roman", serif; font-weight: 400; }
+  h3 { font-size: 13pt; margin-top: 16pt; color: #581c87; }
+  h4 { font-size: 11.5pt; margin-top: 12pt; color: #475569; }
+  p, ul, ol { margin: 8pt 0; }
+  ul, ol { padding-left: 20pt; }
+  li { margin: 3pt 0; }
+  table { border-collapse: collapse; width: 100%; margin: 10pt 0; font-size: 10pt; }
+  th, td { border: 1px solid #d1d5db; padding: 5pt 8pt; text-align: left; vertical-align: top; }
+  th { background: #f1f5f9; font-weight: 600; }
+  code { background: #f1f5f9; padding: 1pt 4pt; border-radius: 3pt; font-family: "SFMono-Regular", Consolas, monospace; font-size: 9.5pt; }
+  pre { background: #0f172a; color: #f1f5f9; padding: 12pt 14pt; border-radius: 6pt; overflow-x: auto; font-size: 9pt; line-height: 1.5; }
+  pre code { background: transparent; color: inherit; padding: 0; }
+  blockquote { border-left: 4px solid #581c87; background: #faf5ff; margin: 10pt 0; padding: 8pt 12pt; color: #4c1d95; }
+  a { color: #1d4ed8; text-decoration: none; }
+  hr { border: none; border-top: 1px solid #e5e7eb; margin: 24pt 0; }
+  /* Editorial cover banner (mirrors the Board Snapshot palette) */
+  .cover { background: #0f172a; color: white; padding: 48pt 36pt; border-radius: 8pt; margin-bottom: 20pt; position: relative; }
+  .cover .tag { font-size: 9pt; letter-spacing: 4pt; text-transform: uppercase; color: #94a3b8; }
+  .cover h1 { color: white; border: none; margin: 8pt 0 0; font-size: 36pt; font-family: Georgia, "Times New Roman", serif; font-weight: 400; line-height: 1.05; letter-spacing: -0.5pt; }
+  .cover .divider { width: 56pt; height: 2pt; background: #f59e0b; margin: 16pt 0; }
+  .cover .sub { font-size: 12pt; color: #e2e8f0; font-style: italic; font-family: Georgia, "Times New Roman", serif; }
+  .cover .meta { font-size: 9pt; opacity: 0.75; margin-top: 18pt; letter-spacing: 2pt; text-transform: uppercase; color: #94a3b8; }
+  /* Page-break hints */
+  table, pre { page-break-inside: avoid; }
+  @page { size: Letter; margin: 0.5in; }
+  @media print {
+    .page { padding: 0; max-width: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+    <div class="cover">
+      <div class="tag">AUBOS · Operating review</div>
+      <h1>CEO View.</h1>
+      <div class="divider"></div>
+      <div class="sub">A command-center dashboard for the things only the CEO can decide — contracts, discounts, runway, strategy.</div>
+      <div class="meta">v1 · May 20, 2026 · Prepared for Ouadie</div>
+    </div>
+    <h1>PRD: CEO View (Ouadie) in command-center</h1>
+<h2>Context</h2>
+<p>AUBOS has three role-specific views in command-center: Product (Sanya), Tech (Mitanshi/Adam/V), and now <strong>CEO</strong> (Ouadie). Ouadie&#39;s day-to-day job is <strong>revenue, runway, contracts, and strategic line-investment decisions</strong> — not tickets or audits. He needs a view that answers one question — <em>Are we winning?</em> — and a tight decision queue for the things only he can resolve.</p>
+<p>This is a sibling deliverable to the Product PRD (<code>docs/PRD-product-view.md</code>). It reuses the role-based shell, the <code>getFactorySupabase()</code> mock backend, recharts charting, and the proposal-deck slide pattern. It introduces a new department (<code>ceo</code>), new pages under <code>/#ceo/*</code>, and extends <code>contract_drafts</code> with discount + CEO sign-off fields.</p>
+<p><strong>Ouadie does NOT see the Tech view at all.</strong> The CEO sidebar replaces the Cleo/AI-Factory sidebar entirely when <code>role=&#39;ceo&#39;</code>, the same way the Product sidebar replaces it when <code>role=&#39;product_manager&#39;</code>.</p>
+<h2>1. Persona &amp; role</h2>
+<table>
+<thead>
+<tr>
+<th>Role slug</th>
+<th>Person</th>
+<th>View</th>
+<th>Core responsibilities</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ceo</code></td>
+<td>Ouadie</td>
+<td><strong>CEO view</strong> (this PRD)</td>
+<td>Approve every customer discount. Sign every customer contract as final signatory. Watch revenue, growth, runway. Decide where to invest. Communicate progress to the board.</td>
+</tr>
+</tbody></table>
+<p>The 3 other roles (product_manager, tech, cto) are scoped in the Product PRD.</p>
+<h2>2. Business rules Ouadie owns</h2>
+<ol>
+<li><strong>Every customer contract requires CEO signature.</strong> Whatever Sanya / legal review puts in front of him is the final stop before &quot;signed&quot;.</li>
+<li><strong>Every discount requires CEO approval.</strong> If the proposed <code>monthly_usd</code> is below the niche&#39;s list price (i.e. <code>discount_pct &gt; 0</code>), it cannot be sent to the customer until Ouadie approves. No discount → no CEO approval gate.</li>
+<li><strong>Live-customer churn risks escalate to the CEO when red &gt; 7 days.</strong> Triage is Sanya&#39;s; rescue strategy is the CEO&#39;s.</li>
+<li><strong>Strategic per-line decisions</strong> (invest / hold / sunset) are the CEO&#39;s call.</li>
+<li><strong>Board / investor updates</strong> flow from this view.</li>
+</ol>
+<h2>3. Information architecture</h2>
+<pre><code>/#ceo
+├── /home                       Main dashboard (north-star + KPIs + Decision Queue + Wins + Strategic + Cash)
+├── /contracts                  Full contracts table (sortable, filterable; signature actions)
+├── /discounts                  Discount approval queue + history
+├── /wins                       Wins feed (last 30/60/90d) + investor-email generator
+├── /strategic                  Expanded per-line strategic comparison (charts + recommendations)
+├── /cash                       Burn breakdown + runway calculator (MOCK)
+└── /board                      Board snapshot — 8-slide deck, exportable to PDF
+</code></pre>
+<p>Sidebar (when <code>role=&#39;ceo&#39;</code>): brand &quot;AUBOS · Executive&quot; + sections matching the routes above + a footer with mock-mode pill + sign-out (same chrome as the Product sidebar).</p>
+<h2>4. Pages</h2>
+<h3>4.1 CEO Home (<code>/#ceo/home</code>) — the 5-second / 30-second / 2-minute layered read</h3>
+<p><strong>4.1.1 North-star (top of page, single sentence)</strong>
+Computed from <code>v_financial_summary</code> + <code>ceo_kpi_inputs</code>:</p>
+<blockquote>
+<p><em>&quot;On track for $25k MRR by EOQ · 2d behind plan · 1 deal closes this week.&quot;</em></p>
+</blockquote>
+<p>Layout: a single tall card spanning the page width with a R/Y/G indicator on the left and the sentence on the right. The same card surfaces the next milestone in tiny text below.</p>
+<p><strong>4.1.2 KPI tile strip (6 tiles)</strong>
+Each tile follows the §19 <code>KpiTile</code> pattern (hover → insight popover). Tiles flagged with the new <code>&lt;MockBadge&gt;</code> chip where the underlying data is placeholder.</p>
+<table>
+<thead>
+<tr>
+<th>Tile</th>
+<th>Source</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>MRR</td>
+<td><code>contract_drafts</code> sum where <code>status in (&#39;signed&#39;,&#39;sent&#39;,&#39;approved&#39;)</code></td>
+<td>Real.</td>
+</tr>
+<tr>
+<td>MoM growth %</td>
+<td>(this month MRR – last month MRR) / last month MRR</td>
+<td>Real once we have 2 months of data; MOCK badge until then.</td>
+</tr>
+<tr>
+<td>Live customers</td>
+<td><code>project_lifecycle_stage_runs</code> count where <code>stage_slug=&#39;live&#39;</code></td>
+<td>Real.</td>
+</tr>
+<tr>
+<td>Net new (MTD)</td>
+<td><code>client_journey_events</code> where <code>event_kind=&#39;onboarding_complete&#39;</code> and <code>at &gt;= start_of_month()</code></td>
+<td>Real.</td>
+</tr>
+<tr>
+<td>Cash runway</td>
+<td><code>ceo_kpi_inputs.cash_balance_usd / monthly_burn_usd</code></td>
+<td><strong>MOCK</strong> badge.</td>
+</tr>
+<tr>
+<td>Burn / mo</td>
+<td><code>ceo_kpi_inputs.monthly_burn_usd</code></td>
+<td><strong>MOCK</strong> badge.</td>
+</tr>
+</tbody></table>
+<p><strong>4.1.3 Decision Queue (the most important panel)</strong>
+Three sub-sections, each with its own header and count. Items only the CEO can resolve.</p>
+<p><strong>A. Contracts awaiting my signature</strong>
+Source: <code>v_ceo_contracts_pending</code> where <code>queue_bucket=&#39;awaiting_ceo_signature&#39;</code>.
+Columns: Customer · List → Final · Discount % · Sent by · Sent at.
+Row action: a primary <strong>&quot;Sign →&quot;</strong> button that opens a confirmation modal.</p>
+<ul>
+<li>On confirm: UPDATE <code>contract_drafts</code> SET <code>ceo_signed_at=now(), ceo_signed_by=&lt;user&gt;, status=&#39;signed&#39;</code>.</li>
+<li>Side effects: notify Sanya (<code>kind=&#39;contract-signed&#39;</code>); the row moves to the Wins feed.</li>
+</ul>
+<p><strong>B. Discount approvals pending</strong>
+Source: <code>v_ceo_contracts_pending</code> where <code>queue_bucket=&#39;awaiting_discount_approval&#39;</code>.
+Columns: Customer · List · Proposed · Discount % · Justification · Submitted by.
+Row actions: <strong>Approve</strong> (primary, blue), <strong>Reject</strong> (red), <strong>Defer</strong> (ghost).</p>
+<ul>
+<li>Approve: <code>ceo_approval_status=&#39;approved&#39;, ceo_approval_at=now(), ceo_approval_by=&lt;user&gt;</code>. Row moves to &quot;Awaiting my signature&quot; bucket.</li>
+<li>Reject: <code>ceo_approval_status=&#39;rejected&#39;, ceo_approval_notes=&lt;reason&gt;</code>. Sanya notified via <code>kind=&#39;discount-rejected&#39;</code>.</li>
+<li>Defer: leaves untouched; closes the row for this session only.</li>
+</ul>
+<p><strong>C. Churn-risk escalations (live + red &gt; 7d)</strong>
+Source: <code>v_account_health</code> where <code>status=&#39;red&#39;</code> AND tenant is live AND time-in-red &gt; 7 days.
+Columns: Customer · Days red · Reason summary · MRR at risk.
+Row action: <strong>Open account →</strong> navigates to <code>/#product/&lt;niche&gt;/customer/&lt;id&gt;</code> (yes, the Product detail page — CEO doesn&#39;t have his own customer-detail page; he reads Sanya&#39;s).</p>
+<p><strong>4.1.4 Wins feed (last 30 days)</strong>
+Source: <code>contract_drafts</code> where <code>ceo_signed_at &gt;= now() - interval &#39;30 days&#39;</code>.
+Each row: Customer · Monthly · Niche · Signed date · Logo (placeholder circle initial).
+Footer: <strong>&quot;Copy as bullet list for board email&quot;</strong> button → assembles markdown bullets and copies to clipboard.</p>
+<p><strong>4.1.5 Per-line strategic comparison (3 cards side by side)</strong>
+For each <code>niche_template</code>:</p>
+<ul>
+<li>Header: line name + niche slug</li>
+<li>MRR (real)</li>
+<li>30-day growth % (computed from sparkline of new signups)</li>
+<li>Live count · in-flight count</li>
+<li><strong>MOCK badge</strong>: burn allocation $/mo (from <code>ceo_kpi_inputs.line_allocations</code> jsonb or hardcoded)</li>
+<li><strong>MOCK badge</strong>: unit economics — CAC, LTV, Payback</li>
+<li><strong>Recommendation chip</strong> (computed): <code>Invest</code> / <code>Hold</code> / <code>Reassess</code><ul>
+<li><code>Invest</code> when growth &gt; 30% AND mrr &gt; burn_allocation</li>
+<li><code>Reassess</code> when growth &lt; 0% OR mrr &lt; 0.5 × burn_allocation</li>
+<li><code>Hold</code> otherwise</li>
+</ul>
+</li>
+</ul>
+<p><strong>4.1.6 People &amp; cash sidebar (right rail)</strong>
+A vertical card with <code>&lt;MockBadge&gt;</code> at the top. Pulls from <code>ceo_kpi_inputs</code>:</p>
+<ul>
+<li>Headcount: 11</li>
+<li>Payroll/mo: $48k</li>
+<li>Other burn: $10k</li>
+<li>Cash balance: $812k</li>
+<li>Runway: 14mo</li>
+<li>Open requisitions: 2</li>
+<li>&quot;Edit inputs →&quot; link → <code>/#ceo/cash</code></li>
+</ul>
+<h3>4.2 <code>/#ceo/contracts</code> — Contracts view</h3>
+<p>Single table of every row in <code>contract_drafts</code>. Filters: status (draft / approved / sent / signed / archived), niche, search by customer name.
+Status column uses the same selectStyle as the Product Issues page. Each row exposes the contextual action: Sign (when awaiting) or &quot;View signed&quot; (when done).</p>
+<h3>4.3 <code>/#ceo/discounts</code> — Discount approval queue</h3>
+<p>Top: stats strip (pending count · approved 30d · rejected 30d · avg discount %).
+Body: full table of every contract with <code>discount_pct &gt; 0</code>, including history. Drill-in panel shows the discount justification + the approval audit trail (<code>ceo_approval_status</code>, <code>ceo_approval_by</code>, <code>ceo_approval_at</code>, <code>ceo_approval_notes</code>).</p>
+<h3>4.4 <code>/#ceo/wins</code> — Wins feed</h3>
+<p>Default range: last 30 days. Toggle for 60 / 90 / YTD.
+Sort: by ceo_signed_at desc. Columns: Customer · Monthly · Niche · Stage (live / building / audit) · Signed.
+Top-right CTA: <strong>&quot;Generate investor update&quot;</strong> → drafts a paragraph in a modal that Ouadie can copy/paste. Text is templated locally — no real send.</p>
+<h3>4.5 <code>/#ceo/strategic</code> — Strategic line comparison (deep dive)</h3>
+<p>Same three lines as the Home strategic card, but expanded:</p>
+<ul>
+<li>MRR trend line chart (12 months) for each line</li>
+<li>New-signup chart (sparkline writ large)</li>
+<li>Cost-to-build chart (mock; per-line allocation)</li>
+<li>Recommendation card with rationale prose</li>
+</ul>
+<h3>4.6 <code>/#ceo/cash</code> — Cash &amp; burn calculator</h3>
+<p>Editable mock inputs (headcount, payroll/mo, other burn, cash balance, MRR target). On change, recomputes runway in real time. Persists to <code>ceo_kpi_inputs</code> (mock = localStorage).</p>
+<h3>4.7 <code>/#ceo/board</code> — Board snapshot deck</h3>
+<p>Opens the same <code>&lt;BoardSnapshotDeck&gt;</code> modal accessible from the Home page header. The full route enables full-page mode for presenting / printing.</p>
+<h2>5. Board Snapshot — slide deck</h2>
+<p>Clone of <code>ProposalDeck.tsx</code> pattern. 8 slides:</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Slide</th>
+<th>Body content</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>Cover</td>
+<td>&quot;AUBOS · Board Snapshot · {Month Year} · Prepared by Ouadie&quot; + AUBOS mark.</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Headline numbers</td>
+<td>4 huge tiles: MRR, MoM growth %, Live customers, Runway months. No chartjunk.</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Customers won (this month)</td>
+<td>List of <code>ceo_signed_at</code> rows from this month with MRR each.</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Customers at risk</td>
+<td>Red-status accounts with reason.</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Per-line scorecard</td>
+<td>3-column comparison (MRR / growth / live / recommendation).</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Cash &amp; burn</td>
+<td>Headcount, payroll, total burn, runway, planned hires.</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Strategic asks</td>
+<td>Bullet list of CEO asks of the board (editable text area).</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Next 30 days</td>
+<td>Top 3 commitments (editable text area).</td>
+</tr>
+</tbody></table>
+<p>Export: reuses the existing <code>command-center/scripts/render-prd-html.cjs</code> pipeline. Output: <code>C:\Users\sanya\Desktop\board-snapshot-{YYYY-MM}.pdf</code>.</p>
+<h2>6. Data model</h2>
+<h3>6.1 <code>contract_drafts</code> — new fields</h3>
+<pre><code class="language-sql">alter table public.contract_drafts
+  add column if not exists list_monthly_usd numeric,                                   -- the niche&#39;s list price at quote time
+  add column if not exists discount_pct numeric default 0,                              -- 0 if no discount; &gt; 0 triggers ceo approval gate
+  add column if not exists discount_justification text,
+  add column if not exists ceo_approval_status text default &#39;not_required&#39;
+    check (ceo_approval_status in (&#39;not_required&#39;,&#39;pending&#39;,&#39;approved&#39;,&#39;rejected&#39;)),
+  add column if not exists ceo_approval_by uuid references public.ops_users(user_id),
+  add column if not exists ceo_approval_at timestamptz,
+  add column if not exists ceo_approval_notes text,
+  add column if not exists ceo_signed_at timestamptz,
+  add column if not exists ceo_signed_by uuid references public.ops_users(user_id);
+</code></pre>
+<p>Trigger logic: when a discounted <code>contract_drafts</code> row is inserted/updated with <code>discount_pct &gt; 0</code> and <code>ceo_approval_status=&#39;not_required&#39;</code>, flip it to <code>&#39;pending&#39;</code> automatically. In mock mode this is enforced in <code>mockSupabase.ts</code>.</p>
+<h3>6.2 <code>ceo_kpi_inputs</code> — new table</h3>
+<pre><code class="language-sql">create table if not exists public.ceo_kpi_inputs (
+  id uuid primary key default gen_random_uuid(),
+  month date not null unique,                          -- &#39;YYYY-MM-01&#39;
+  monthly_burn_usd numeric not null,
+  payroll_usd numeric not null,
+  headcount int not null,
+  cash_balance_usd numeric not null,
+  mrr_target_usd numeric not null,
+  line_allocations jsonb not null default &#39;{}&#39;,         -- {&quot;cleo-for-pools&quot;: 22000, ...}
+  open_requisitions jsonb not null default &#39;[]&#39;,        -- [{&quot;title&quot;: &quot;Sr. AI engineer&quot;, &quot;manager&quot;: &quot;V&quot;}]
+  updated_at timestamptz default now()
+);
+</code></pre>
+<h3>6.3 <code>v_ceo_contracts_pending</code> — new view</h3>
+<pre><code class="language-sql">create or replace view public.v_ceo_contracts_pending as
+select
+  cd.id, cd.company_id, c.name as company_name, c.niche,
+  cd.monthly_usd, cd.list_monthly_usd, cd.discount_pct, cd.discount_justification,
+  cd.status, cd.ceo_approval_status, cd.ceo_approval_by, cd.ceo_approval_at,
+  cd.ceo_signed_at, cd.sent_at,
+  case
+    when cd.discount_pct &gt; 0 and cd.ceo_approval_status = &#39;pending&#39; then &#39;awaiting_discount_approval&#39;
+    when cd.status in (&#39;approved&#39;,&#39;sent&#39;) and cd.ceo_signed_at is null then &#39;awaiting_ceo_signature&#39;
+    when cd.ceo_signed_at is not null then &#39;signed&#39;
+    else &#39;idle&#39;
+  end as queue_bucket
+from public.contract_drafts cd
+join public.companies c on c.id = cd.company_id;
+</code></pre>
+<h3>6.4 New notification kinds</h3>
+<table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>Recipient</th>
+<th>Trigger</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>contract-signed</code></td>
+<td>Sanya (product_manager)</td>
+<td>CEO clicks Sign</td>
+</tr>
+<tr>
+<td><code>discount-rejected</code></td>
+<td>Sanya</td>
+<td>CEO rejects a discount</td>
+</tr>
+<tr>
+<td><code>discount-approved</code></td>
+<td>Sanya</td>
+<td>CEO approves a discount (so she can send the contract)</td>
+</tr>
+<tr>
+<td><code>churn-risk-escalation</code></td>
+<td>CEO</td>
+<td>nightly check finds a live account red &gt; 7d</td>
+</tr>
+</tbody></table>
+<h2>7. Files to create / modify</h2>
+<h3>7.1 New pages (under <code>command-center/src/pages/ceo/</code>)</h3>
+<ul>
+<li><code>CeoHome.tsx</code> — composition of all the home sections</li>
+<li><code>CeoContracts.tsx</code> — full contracts table</li>
+<li><code>CeoDiscounts.tsx</code> — discount queue + history</li>
+<li><code>CeoWins.tsx</code> — wins feed + investor email generator</li>
+<li><code>CeoStrategic.tsx</code> — expanded per-line comparison</li>
+<li><code>CeoCash.tsx</code> — editable burn / runway calculator</li>
+<li><code>CeoBoardSnapshot.tsx</code> — full-page board snapshot</li>
+</ul>
+<h3>7.2 New components (under <code>command-center/src/components/</code>)</h3>
+<ul>
+<li><code>MockBadge.tsx</code> — small yellow &quot;MOCK&quot; chip (reusable)</li>
+<li><code>CeoDecisionQueue.tsx</code> — the 3-section queue on CeoHome</li>
+<li><code>StrategicLineCard.tsx</code> — single per-line card (compact + expanded variants)</li>
+<li><code>WinsFeed.tsx</code> — wins list + &quot;copy to board email&quot; CTA</li>
+<li><code>BoardSnapshotDeck.tsx</code> — 8-slide deck (sibling to ProposalDeck)</li>
+</ul>
+<h3>7.3 New libs (under <code>command-center/src/lib/</code>)</h3>
+<ul>
+<li><code>ceo-data.ts</code> — pure functions: <code>computeNorthStar()</code>, <code>computeKpiInsights()</code>, <code>computeQueueRows()</code>, <code>computeStrategicCards()</code>.</li>
+<li><code>ceo-mock-financials.ts</code> — default <code>ceo_kpi_inputs</code> content for seeds.</li>
+</ul>
+<h3>7.4 Modified files</h3>
+<ul>
+<li><code>command-center/src/shell/route.ts</code> — add <code>&#39;ceo&#39;</code> to <code>Department</code> union and adjust <code>DEFAULT_ROUTE_*</code> helpers.</li>
+<li><code>command-center/src/shell/Sidebar.tsx</code> — render the CEO sidebar set when <code>role=&#39;ceo&#39;</code> (mirrors the <code>product_manager</code> branch). Tech departments are NOT visible to CEO.</li>
+<li><code>command-center/src/App.tsx</code> — <code>PageRouter</code> dispatches <code>#ceo/*</code> segments to the CEO pages.</li>
+<li><code>command-center/src/lib/seeds.ts</code> — add discount + ceo_approval_status to 2 existing contract_drafts rows; add 2 &quot;signed&quot; contract_drafts rows for the Wins feed; add a ceo_kpi_inputs row for the current month.</li>
+<li><code>command-center/src/lib/mockSupabase.ts</code> — recognize <code>ceo_kpi_inputs</code> as a table (auto-created on insert is fine) and compute <code>v_ceo_contracts_pending</code> via a reducer. Add the discount-→-pending automation in <code>insert/update</code> on contract_drafts.</li>
+</ul>
+<h2>8. Verification</h2>
+<ol>
+<li><strong>Role swap</strong>: promote Sanya&#39;s mock user to <code>role=&#39;ceo&#39;</code> (or add a dev toggle). Reload command-center → CEO sidebar appears; Cleo/Factory sidebars are gone.</li>
+<li><strong>Home renders</strong>: north-star sentence reads from current MRR + target. 6 KPI tiles populate; runway/burn carry MOCK chips.</li>
+<li><strong>Decision Queue</strong>:<ul>
+<li>&quot;Contracts awaiting my signature&quot; lists at least 1 seeded contract.</li>
+<li>&quot;Discount approvals pending&quot; lists at least 1 seeded contract with <code>discount_pct &gt; 0</code>.</li>
+<li>&quot;Churn-risk escalations&quot; lists any red-&gt; 7d accounts.</li>
+</ul>
+</li>
+<li><strong>Approve a discount</strong> → it disappears from the discount queue and appears in the signature queue. Sanya receives a <code>discount-approved</code> notification.</li>
+<li><strong>Reject a discount</strong> → it disappears with notes recorded. Sanya receives <code>discount-rejected</code>.</li>
+<li><strong>Sign a contract</strong> → <code>ceo_signed_at</code> set; row moves to the Wins feed within the same session.</li>
+<li><strong>Strategic cards</strong>: each of the 3 lines shows a recommendation chip with a sensible value given the seeded data.</li>
+<li><strong>Board snapshot</strong>: clicking the header button opens the 8-slide deck modal. &quot;Export PDF&quot; produces <code>board-snapshot-{YYYY-MM}.pdf</code> on the Desktop using the existing render pipeline.</li>
+</ol>
+<h2>8a. Round-5 feedback — Product → CEO escalations + Editorial board snapshot</h2>
+<p>Captured from Sanya&#39;s walk-through of the CEO view.</p>
+<h3>8a.1 Product → CEO escalations (new channel)</h3>
+<p>Sanya needs a clean way to send Ouadie anything that needs his decision beyond the auto-routed contract / discount / audit-disapprove flows. Examples: customer pricing exceptions, strategic line questions, hiring asks, vendor decisions.</p>
+<p><strong>Data model</strong> (mock auto-creates on first insert):</p>
+<pre><code class="language-sql">create table public.ceo_escalations (
+  id uuid primary key default gen_random_uuid(),
+  raised_by uuid not null references public.ops_users(user_id),
+  title text not null,
+  body text,
+  category text not null check (category in (&#39;customer&#39;,&#39;contract&#39;,&#39;strategic&#39;,&#39;budget&#39;,&#39;hire&#39;,&#39;vendor&#39;,&#39;other&#39;)),
+  urgency text not null default &#39;normal&#39; check (urgency in (&#39;low&#39;,&#39;normal&#39;,&#39;high&#39;,&#39;urgent&#39;)),
+  related_company_id uuid references public.companies(id),
+  status text not null default &#39;open&#39; check (status in (&#39;open&#39;,&#39;acknowledged&#39;,&#39;decided&#39;,&#39;deferred&#39;,&#39;rejected&#39;)),
+  decision text,
+  decision_notes text,
+  decided_by uuid references public.ops_users(user_id),
+  decided_at timestamptz,
+  created_at timestamptz not null default now()
+);
+</code></pre>
+<p><strong>Sanya&#39;s entry points</strong> (both):</p>
+<ul>
+<li><strong>Sidebar footer button</strong> on the Product view — always-visible &quot;🟣 Raise to CEO&quot; → opens <code>&lt;RaiseToCeoPopup&gt;</code>.</li>
+<li><strong>Contextual button</strong> on <code>ProductCustomerDetail</code> header → same popup pre-filled with <code>related_company_id</code> + <code>category=&#39;customer&#39;</code>.</li>
+</ul>
+<p><strong><code>&lt;RaiseToCeoPopup&gt;</code></strong> — form fields: category (customer/contract/strategic/budget/hire/vendor/other), urgency (low/normal/high/urgent), title (80 chars max), body, optional company picker. Submit INSERTs <code>ceo_escalations</code> with status=&#39;open&#39; + queues <code>kind=&#39;ceo-escalation-raised&#39;</code> notification to Ouadie.</p>
+<p><strong>CEO view — new &quot;Raised by Product&quot; section</strong> on <code>/#ceo/home</code>, inserted between the Decision Queue and the Wins feed:</p>
+<ul>
+<li>Lists <code>ceo_escalations</code> with status in (&#39;open&#39;,&#39;acknowledged&#39;), sorted by urgency desc then age desc.</li>
+<li>Each row: urgency dot · category badge · title · age · 80-char summary · &quot;Open →&quot; button.</li>
+<li>Click &quot;Open →&quot; opens <code>&lt;EscalationDecisionModal&gt;</code> with the full body + customer link + 4 decision controls:<ul>
+<li><strong>Acknowledge</strong> (status=&#39;acknowledged&#39; — no commitment yet)</li>
+<li><strong>Approve</strong> (status=&#39;decided&#39;, decision=&#39;approved&#39;, optional notes)</li>
+<li><strong>Reject</strong> (status=&#39;rejected&#39;, notes required)</li>
+<li><strong>Defer</strong> (status=&#39;deferred&#39;, optional notes)</li>
+</ul>
+</li>
+<li>Each decision writes back to <code>ceo_escalations</code> and notifies Sanya via <code>kind=&#39;escalation-decided&#39;</code>.</li>
+</ul>
+<p><strong>Dedicated page</strong> <code>/#ceo/escalations</code> — full history filterable by category + status. New entry in CEO sidebar between &quot;Discount approvals&quot; and &quot;Wins feed&quot;.</p>
+<h3>8a.2 Premium Board Snapshot — Editorial redesign</h3>
+<p>The previous deck looked underbuilt. Replaced the body of <code>BoardSnapshotDeck.tsx</code> with an editorial aesthetic (NYT / FT pitch deck reference look).</p>
+<p><strong>Design principles</strong></p>
+<ul>
+<li><strong>Fixed 16:9 aspect ratio</strong> per slide via <code>aspect-ratio: 16/9</code> on the slide frame.</li>
+<li><strong>Generous whitespace</strong> — 76px top / 64px sides padding.</li>
+<li><strong>Serif headings</strong> at ~48pt; body in the existing Geist sans.</li>
+<li><strong>One accent color per slide</strong> — restrained palette: deep slate, claret, forest, navy, violet, amber, teal, graphite.</li>
+<li><strong>Huge stats</strong> — headline numbers at ~60pt serif; sub-labels at small-caps 10pt letter-spaced 3px.</li>
+<li><strong>Slide chrome</strong> — tiny section label top-left (uppercase small caps), AUBOS mark bottom-left, page number &quot;03 / 08&quot; bottom-right; hairline border on the frame.</li>
+<li><strong>Charts removed from stat slides</strong> — pure typography.</li>
+</ul>
+<p><strong>Per-slide redesign</strong></p>
+<ol>
+<li><strong>Cover</strong> — full-bleed deep slate background. Tiny &quot;AUBOS · Operating review&quot; tag · serif &quot;Board Snapshot.&quot; headline · thin amber divider · italic month label · &quot;Prepared by Ouadie&quot; small caps.</li>
+<li><strong>Headline numbers</strong> — white background. 2×2 grid of <code>Statline</code> blocks (label small caps · 60pt serif value · italic sub-sentence). MRR / Live customers / Runway · MOCK / MoM growth · MOCK.</li>
+<li><strong>Customers won</strong> — list rows: serif name (22pt) + niche small caps · big monthly $ on the right in accent color. Hairline row separators.</li>
+<li><strong>Customers at risk</strong> — list with a claret left border per row. Italic reason underneath the customer name. Empty state &quot;No accounts in yellow or red this month.&quot;</li>
+<li><strong>Per-product-line scorecard</strong> — 3 columns. Serif line name (~22pt) · 3 <code>Metric</code> rows (MRR / Live / 30d growth · MOCK) · accent-colored &quot;→ Invest / Hold / Reassess&quot; line at the bottom. Decision is computed: &gt; $3k MRR → Invest, &gt; $0 → Hold, else Reassess.</li>
+<li><strong>Cash &amp; burn</strong> — 2×2 grid of <code>Statline</code> blocks (Headcount / Payroll / Total burn / Runway, all MOCK). Below: italic list of open requisitions with manager attribution.</li>
+<li><strong>Strategic asks</strong> — three serif pull-quotes (22pt italic), each attributed to a product line in small caps.</li>
+<li><strong>Next 30 days</strong> — three numbered commitments (<code>01 02 03</code> in italic serif), each as a 22pt serif sentence with a precise verb-led commitment.</li>
+</ol>
+<p><strong>Presentation mode</strong> (new). On the embedded deck, a &quot;▶ Present&quot; button switches to full-viewport mode: dark background, slide centered at <code>min(96vw, calc(96vh * 16 / 9))</code>, chrome hidden. Arrow keys / space / PageDown advance; Escape exits. Top-right &quot;Exit (Esc)&quot; button as fallback.</p>
+<p><strong>Files</strong></p>
+<ul>
+<li>New: <code>components/RaiseToCeoPopup.tsx</code>, <code>components/EscalationDecisionModal.tsx</code>, <code>components/CeoEscalationQueue.tsx</code>, <code>pages/ceo/CeoEscalations.tsx</code>.</li>
+<li>Modified: <code>shell/Sidebar.tsx</code> (Raise-to-CEO footer button when role=product_manager; Escalations section in CEO sidebar), <code>shell/Shell.tsx</code> + <code>App.tsx</code> (pass userId through; route <code>#ceo/escalations</code>), <code>pages/product/ProductCustomerDetail.tsx</code> (header contextual button), <code>pages/ceo/CeoHome.tsx</code> (insert Escalations section between Decision Queue and Wins), <code>components/BoardSnapshotDeck.tsx</code> (full editorial rewrite + present mode), <code>lib/seeds.ts</code> (3 example escalations).</li>
+</ul>
+<p><strong>Seeded escalations</strong></p>
+<ol>
+<li>&quot;Pacific Pools wants 35% off — above policy&quot; · category=contract · urgency=high · related=Pacific Pools · raised 2d ago</li>
+<li>&quot;Should we sunset Gameday Model? Only 1 live in 60d.&quot; · category=strategic · urgency=normal · raised 5d ago</li>
+<li>&quot;Hire a second designer for Real Estate launch?&quot; · category=hire · urgency=normal · status=acknowledged · raised 8d ago</li>
+</ol>
+<h3>8a.3 Verification (round-5)</h3>
+<ul>
+<li>As Sanya (<code>role=&#39;product_manager&#39;</code>): footer &quot;🟣 Raise to CEO&quot; appears in the sidebar; clicking opens the popup.</li>
+<li>Open Pacific Pools customer detail → header shows &quot;🟣 Raise to CEO →&quot; button; opening it pre-fills category=customer + related_company_id.</li>
+<li>Submit a new escalation → row inserted; notification to Ouadie.</li>
+<li>As Ouadie (<code>role=&#39;ceo&#39;</code>): <code>/#ceo/home</code> shows a new &quot;Raised by Product&quot; section between Decision Queue and Wins. Sidebar lists &quot;Escalations from Product&quot;.</li>
+<li>Click an item → <code>&lt;EscalationDecisionModal&gt;</code> opens with body + customer link + 4 decision buttons.</li>
+<li>Approve with notes → escalation moves to history; Sanya receives <code>escalation-decided</code> notification.</li>
+<li><code>/#ceo/escalations</code> shows the full filterable history with status + category dropdowns.</li>
+<li>Open Board Snapshot (modal on CeoHome or <code>/#ceo/board</code> full-page): editorial layout — fixed 16:9 frame, serif headings, big stats, slide chrome (&quot;01 / 08&quot;, AUBOS mark, section label). &quot;▶ Present&quot; → full-viewport; arrow keys / space advance; Escape exits.</li>
+</ul>
+<h2>9. Out of scope (v1)</h2>
+<ul>
+<li>Real Brex / QuickBooks / Stripe ingest for burn / cash / MRR. We use <code>ceo_kpi_inputs</code> editable in <code>/#ceo/cash</code>.</li>
+<li>Real e-signature provider (DocuSign etc.) for the &quot;Sign&quot; button. v1 just flips <code>ceo_signed_at</code> and notifies — the contract pdf+signature panel is a follow-up.</li>
+<li>NPS / CSAT pipeline. Placeholder card only.</li>
+<li>Investor email <em>send</em>. v1 generates draft text in the app; sending uses existing <code>outbound_emails</code> once a provider is wired.</li>
+<li>Hiring requisitions table. v1 surfaces them inline in <code>ceo_kpi_inputs.open_requisitions</code> as a static list, with a future ticket to make them their own first-class entities.</li>
+<li>Per-customer churn-rescue workflow. CEO clicks &quot;Open account&quot; → lands on the Product customer detail page (Sanya&#39;s page), reuses its action panel.</li>
+</ul>
+
+  </div>
+</body>
+</html>

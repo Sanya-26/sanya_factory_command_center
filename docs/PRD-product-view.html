@@ -1025,6 +1025,127 @@ create table public.scheduled_calls (
 <li>Issues page: every select renders white-on-dark-text, readable at a glance. Same on Flags and Customer Detail checklist.</li>
 </ul>
 <hr>
+<h2>22. Round-6 — Team management</h2>
+<h3>22.1 Context</h3>
+<p>Sanya wants an <strong>engineer-first surface</strong> so she can manage the team: see what each person is working on, who&#39;s stuck, who&#39;s been sitting on something too long. Today the only view of engineers is <code>ProductIssues</code>, where they show up as a column on an issue-first table. §22 adds the inverse — one card per engineer with their now-state, oldest in-progress item, stuck items, and weekly throughput.</p>
+<h3>22.2 Scope (v1)</h3>
+<ul>
+<li><strong>Work source</strong>: <code>tech_issues</code> only. No new schema; no per-customer build ownership. Engineer-to-build assignment is a follow-up.</li>
+<li><strong>Stuck rules</strong> (single source of truth in <code>lib/team-data.ts</code>):<ol>
+<li><code>status=&#39;blocked&#39;</code> (any age)</li>
+<li><code>status=&#39;in_progress&#39;</code> AND <code>updated_at</code> older than <strong>5 days</strong></li>
+<li><code>status=&#39;open&#39;</code>, assigned, never moved to in_progress, <code>created_at</code> older than <strong>7 days</strong></li>
+</ol>
+</li>
+<li><strong>Drill-in</strong>: clicking an engineer card opens a right-side drawer with their full issue list grouped by status (In progress · Blocked · Open · Closed last 14d).</li>
+</ul>
+<h3>22.3 Page layout — <code>/#product/team</code></h3>
+<p><strong>KPI strip — 4 tiles (<code>KpiTile</code> with hover insight):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Tile</th>
+<th>Computation</th>
+<th>Insight</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Active engineers</td>
+<td>role∈{tech,cto} with any open/in_progress/blocked</td>
+<td>Lists every engineer + how many active</td>
+</tr>
+<tr>
+<td>Open issues (team)</td>
+<td>sum of open + in_progress + blocked across team</td>
+<td>Names who carries the most</td>
+</tr>
+<tr>
+<td>Stuck items</td>
+<td>rows matching §22.2 stuck rules</td>
+<td>Red value if &gt; 0; names the oldest stuck item</td>
+</tr>
+<tr>
+<td>Throughput · 7d</td>
+<td>closed in last 7 days, summed across team</td>
+<td>Names the top closer</td>
+</tr>
+</tbody></table>
+<p><strong>Engineer cards</strong> — 3 columns, one per engineer:</p>
+<ul>
+<li>Header: name + role chip + (conditional) &quot;N stuck&quot; pill</li>
+<li>&quot;Now&quot; row: Open / In progress / Blocked pills</li>
+<li>Working on: top 1–3 in_progress items, sorted by oldest <code>updated_at</code>, with severity chip + age</li>
+<li>Stuck row (red, conditional): &quot;Stuck on <em><title></em> · <em><N></em> d · <em><reason></em>&quot;</li>
+<li>Closed 7d: big number + 12-week throughput sparkline</li>
+<li>Footer: <strong>Open queue →</strong> opens <code>&lt;EngineerQueueDrawer&gt;</code></li>
+</ul>
+<p><strong>Team-wide stuck list</strong> (right rail, <code>&lt;ChartCard&gt;</code>-wrapped):</p>
+<ul>
+<li>One row per stuck item across all engineers, sorted oldest first</li>
+<li>Each row: red dot · title · &quot;Sanya · reason · age&quot; subline · Open button → drawer</li>
+</ul>
+<p><strong>Workload balance</strong> (<code>&lt;ChartCard&gt;</code> + recharts horizontal stacked bar):</p>
+<ul>
+<li>One row per engineer, stacks: Open / In progress / Blocked</li>
+</ul>
+<p><strong>Throughput trend</strong> (<code>&lt;ChartCard&gt;</code> + recharts line chart):</p>
+<ul>
+<li>12 weeks × per-engineer issues closed/week; one line per engineer</li>
+</ul>
+<h3>22.4 Engineer queue drawer (<code>&lt;EngineerQueueDrawer&gt;</code>)</h3>
+<p>Right-side overlay (Esc + overlay-click to close). Header shows name + role + summary chip (&quot;X open · Y in progress · Z blocked · 7d closed: N&quot;). Body: 4 grouped lists — In progress · Blocked · Open · Closed (last 14d). Each row deep-links to <code>/#product/issues</code>.</p>
+<h3>22.5 Data layer</h3>
+<p><strong><code>lib/team-data.ts</code></strong> (pure, side-effect-free):</p>
+<ul>
+<li><code>isStuck(issue, now?) → { stuck, reason?, age_days }</code></li>
+<li><code>computeEngineerCards(issues, users, now?) → EngineerCard[]</code></li>
+<li><code>computeTeamStuckList(issues, users, now?) → StuckRow[]</code></li>
+<li>Constants: <code>STALE_IN_PROGRESS_DAYS=5</code>, <code>NEVER_STARTED_DAYS=7</code></li>
+</ul>
+<p><strong><code>mockSupabase.ts</code></strong> — new computed view <code>v_team_workload</code>. Same compute-on-demand pattern as <code>v_account_health</code> / <code>v_issues_with_flag_stats</code>. Calls <code>computeEngineerCards</code> from team-data.</p>
+<h3>22.6 Seeds enrichment</h3>
+<p>5 demo <code>tech_issues</code> added so each engineer card lights up:</p>
+<ol>
+<li><code>ti-team-blocked-01</code> — Mitanshi · blocked · &quot;Stripe webhook signature mismatch&quot; (demonstrates <code>blocked</code> stuck rule)</li>
+<li><code>ti-team-stale-01</code> — Adam · in_progress · updated 7d ago (demonstrates <code>stale_in_progress</code>)</li>
+<li><code>ti-team-neverstarted-01</code> — V · open · created 9d ago (demonstrates <code>never_started</code>)</li>
+<li><code>ti-team-done-recent-01</code> — Mitanshi · done · closed 2d ago (populates Throughput)</li>
+<li><code>ti-team-done-recent-02</code> — Adam · done · closed 4d ago (populates Throughput)</li>
+</ol>
+<h3>22.7 Files</h3>
+<p><strong>New</strong></p>
+<ul>
+<li><code>command-center/src/pages/product/ProductTeam.tsx</code></li>
+<li><code>command-center/src/components/EngineerCard.tsx</code></li>
+<li><code>command-center/src/components/EngineerQueueDrawer.tsx</code></li>
+<li><code>command-center/src/lib/team-data.ts</code></li>
+</ul>
+<p><strong>Modified</strong></p>
+<ul>
+<li><code>command-center/src/shell/Sidebar.tsx</code> — add <code>{ id: &quot;team&quot;, label: &quot;Team&quot; }</code> between Real Estate Model and Issues</li>
+<li><code>command-center/src/App.tsx</code> — <code>route.section === &quot;team&quot;</code> → <code>&lt;ProductTeamPage /&gt;</code></li>
+<li><code>command-center/src/lib/mockSupabase.ts</code> — <code>computeTeamWorkload</code> + register <code>v_team_workload</code></li>
+<li><code>command-center/src/lib/seeds.ts</code> — 5 demo tech_issues (see §22.6)</li>
+</ul>
+<h3>22.8 Verification</h3>
+<ol>
+<li>As Sanya, open <code>/#product/team</code>. Sidebar shows <strong>Team</strong> between Real Estate Model and Issues; it is active.</li>
+<li>KPI strip: Active engineers = 3 (Mitanshi, Adam, V); Open issues populated; Stuck items &gt; 0 in red; Throughput last 7d ≥ 2.</li>
+<li>Three engineer cards render. Each shows pills + 1–3 in-progress items. Mitanshi shows a red Stuck row (&quot;Blocked&quot;). Adam shows red Stuck (&quot;No activity 5+ days&quot;). V shows red Stuck (&quot;Assigned 7+ days, never started&quot;).</li>
+<li>Team-wide stuck list aggregates ≥ 3 rows sorted oldest first.</li>
+<li>Click an Engineer Card → drawer opens. Lists grouped by status. &quot;Open →&quot; navigates to /#product/issues.</li>
+<li>Workload balance: stacked bars per engineer. Throughput chart: 3 lines, 12 weeks.</li>
+<li><code>tsc --noEmit</code> exit 0.</li>
+<li>Hover any KPI tile → insight popover.</li>
+</ol>
+<h3>22.9 Out of scope (v1)</h3>
+<ul>
+<li>Per-customer build ownership (a real engineer ↔ stage_run join). Follow-up if/when needed.</li>
+<li>Editing engineer profile / vacation / working-hours.</li>
+<li>Auto-Slack nudges when an item crosses the stuck threshold (notification layer exists; ticket on its own).</li>
+<li>Reassigning from inside the drawer (Issues page already supports this).</li>
+</ul>
+<hr>
 <h2>Appendix A — Catalog of new AI agents</h2>
 <p>This is what&#39;s introduced in this PRD relative to the pre-existing AI Factory pipeline (Planner, Backend-dev, Frontend-dev, VPS-dev, Code-critic, Visual-a11y). Each new agent has its own daemon row in <code>agent_pods</code> and a registry row in <code>agent_registry</code>.</p>
 <h3>A.1 Synopsis Agent (§6.4)</h3>
