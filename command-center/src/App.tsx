@@ -44,6 +44,8 @@ import { CeoWinsPage } from "./pages/ceo/CeoWins";
 import { CeoStrategicPage } from "./pages/ceo/CeoStrategic";
 import { CeoCashPage } from "./pages/ceo/CeoCash";
 import { CeoBoardSnapshotPage } from "./pages/ceo/CeoBoardSnapshot";
+import { MyAvailabilityPage } from "./pages/calendar/MyAvailability";
+import { MyBookingsPage } from "./pages/calendar/MyBookings";
 
 const OAUTH_CALLBACK_PATH = "/oauth/google-calendar/callback";
 
@@ -180,6 +182,10 @@ function PageRouter({
   role: string;
   userId: string;
 }): JSX.Element {
+  if (route.dept === "calendar") {
+    if (route.section === "bookings") return <MyBookingsPage userId={userId} />;
+    return <MyAvailabilityPage userId={userId} />;
+  }
   if (route.dept === "ceo") {
     if (route.section === "home") return <CeoHomePage userId={userId} />;
     if (route.section === "contracts") return <CeoContractsPage userId={userId} />;
@@ -199,7 +205,7 @@ function PageRouter({
     // /product/<niche>[/customer/<id>] or /product/<niche>/flags
     const niche = route.section;
     if (route.id === "customer" && route.sub)
-      return <ProductCustomerDetailPage niche={niche} companyId={route.sub} userId={userId} />;
+      return <ProductCustomerDetailPage niche={niche} companyId={route.sub} userId={userId} role={role} />;
     if (route.id === "flags") return <ProductFlagsPage niche={niche} />;
     return <ProductVariationPage niche={niche} />;
   }
@@ -234,6 +240,12 @@ function PageRouter({
 }
 
 function buildTrail(r: Route): Array<{ label: string; onClick?: () => void }> {
+  if (r.dept === "calendar") {
+    return [
+      { label: "Calendar" },
+      { label: r.section === "bookings" ? "My bookings" : "My availability" },
+    ];
+  }
   if (r.dept === "ceo") {
     const ceoSection: Record<string, string> = {
       home: "Main dashboard",

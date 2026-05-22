@@ -10,6 +10,22 @@ dist/
 .claude/
 src-tauri/target/
 
+# Supabase CLI scratch
+supabase/.temp/
+
+# Local-only audit scripts (contain the project PAT)
+.audit/
+
+# Internal Phase 5-9 audit + build artifacts — not for public repo
+BUILD_LOG.md
+BUILD_PLAN.md
+CROSS_CHECK_REPORT.md
+POST_TEST_CLEANUP.md
+REAL_SCHEMA_AUDIT.md
+SCHEMA_COMPARISON.md
+SELF_GAP_REPORT.md
+UI_EXPECTATIONS.md
+
 # tsc -b build artifacts (emit alongside .tsx; we don't commit them)
 **/src/**/*.tsx.d.ts
 **/command-center/src/App.d.ts

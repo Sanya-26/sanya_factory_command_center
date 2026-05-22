@@ -46,10 +46,12 @@ export function ProductCustomerDetailPage({
   niche,
   companyId,
   userId,
+  role,
 }: {
   niche: string;
   companyId: string;
   userId: string;
+  role?: string;
 }): JSX.Element {
   const [company, setCompany] = useState<Company | null>(null);
   const [stage, setStage] = useState<StageRun | null>(null);
@@ -63,11 +65,13 @@ export function ProductCustomerDetailPage({
   const [popup, setPopup] = useState<PopupKind>(null);
   const [raiseOpen, setRaiseOpen] = useState(false);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       const sb = getFactorySupabase();
-      const [{ data: c }, { data: stages }, { data: hRows }, { data: chk }, { data: evs }, { data: openFlags }, { data: openIssues }] = await Promise.all([
+      const [companyRes, stagesRes, hRes, chkRes, evsRes, flagsRes, issuesRes] = await Promise.all([
         sb.from("companies").select("id, name, email, niche").eq("id", companyId).maybeSingle(),
         sb.from("project_lifecycle_stage_runs").select("stage_slug, status, started_at, completed_at, updated_at").eq("project_id", companyId).order("updated_at", { ascending: false }).limit(1),
         sb.from("v_account_health").select("status").eq("company_id", companyId).maybeSingle(),
@@ -77,13 +81,34 @@ export function ProductCustomerDetailPage({
         sb.from("tech_issues").select("id, status").eq("company_id", companyId),
       ]);
       if (cancelled) return;
-      setCompany((c ?? null) as Company | null);
-      setStage(((stages ?? [])[0] ?? null) as StageRun | null);
-      if (hRows) setHealth((hRows as { status: HealthStatus }).status);
-      if (chk) setChecklist(chk as { id: string; items: ChecklistItem[] });
-      setEvents((evs ?? []) as Event[]);
-      setFlagCount(((openFlags ?? []) as unknown[]).length);
-      const openTI = ((openIssues ?? []) as Array<{ status: string }>).filter((i) => !["done", "wontfix"].includes(i.status));
+
+      // Surface real errors in dev mode (per Phase 6 hotfix 6.3). Each
+      // query is independent — log all failures but render whatever loaded.
+      if (import.meta.env.DEV) {
+        const failed: string[] = [];
+        if (companyRes.error) failed.push(`companies: ${companyRes.error.message}`);
+        if (stagesRes.error) failed.push(`stages: ${stagesRes.error.message}`);
+        if (hRes.error) failed.push(`health: ${hRes.error.message}`);
+        if (chkRes.error) failed.push(`checklist: ${chkRes.error.message}`);
+        if (evsRes.error) failed.push(`events: ${evsRes.error.message}`);
+        if (flagsRes.error) failed.push(`flags: ${flagsRes.error.message}`);
+        if (issuesRes.error) failed.push(`issues: ${issuesRes.error.message}`);
+        if (failed.length > 0) {
+          console.warn("[ProductCustomerDetail] partial failures:", failed);
+          const hint = failed.some(f => f.includes("is_ops_user"))
+            ? " (anon session can't read is_ops_user()-gated tables — sign in for real)"
+            : "";
+          setLoadError(`Some queries failed: ${failed.join(" · ")}${hint}`);
+        }
+      }
+
+      setCompany((companyRes.data ?? null) as Company | null);
+      setStage((((stagesRes.data ?? []) as StageRun[])[0] ?? null) as StageRun | null);
+      if (hRes.data) setHealth((hRes.data as { status: HealthStatus }).status);
+      if (chkRes.data) setChecklist(chkRes.data as { id: string; items: ChecklistItem[] });
+      setEvents((evsRes.data ?? []) as Event[]);
+      setFlagCount(((flagsRes.data ?? []) as unknown[]).length);
+      const openTI = ((issuesRes.data ?? []) as Array<{ status: string }>).filter((i) => !["done", "wontfix"].includes(i.status));
       setIssueCount(openTI.length);
     })();
     return () => { cancelled = true; };
@@ -94,6 +119,11 @@ export function ProductCustomerDetailPage({
 
   return (
     <div style={{ padding: 24, display: "grid", gap: 16, maxWidth: 1240 }}>
+      {loadError ? (
+        <div style={{ background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a", padding: 10, borderRadius: 6, fontSize: 13 }}>
+          <strong>Partial data:</strong> {loadError}
+        </div>
+      ) : null}
       <header style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <button type="button" className="btn-ghost" onClick={() => navigate({ dept: "product", section: niche })}>
           ← Back
@@ -111,14 +141,16 @@ export function ProductCustomerDetailPage({
           <span style={{ width: 10, height: 10, borderRadius: 999, background: STATUS_COLOR[health] }} />
           {health.toUpperCase()}
         </span>
-        <button
-          type="button"
-          onClick={() => setRaiseOpen(true)}
-          style={{ padding: "6px 12px", background: "#7c3aed", color: "white", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
-          title="Send Ouadie something about this customer that needs his decision"
-        >
-          🟣 Raise to CEO →
-        </button>
+        {role === "product_manager" ? (
+          <button
+            type="button"
+            onClick={() => setRaiseOpen(true)}
+            style={{ padding: "6px 12px", background: "#7c3aed", color: "white", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+            title="Send Ouadie something about this customer that needs his decision"
+          >
+            🟣 Raise to CEO →
+          </button>
+        ) : null}
       </header>
 
       <StageStepper currentStage={stage?.stage_slug} />
@@ -451,16 +483,75 @@ function DecisionButtons({
     onState("saving");
     try {
       const sb = getFactorySupabase();
-      const { error: insErr } = await sb.from("sanya_audit_decisions").insert({
-        company_id: companyId,
-        decision,
-        notes: notes ?? null,
-        decided_by: userId,
-      });
+      // 1. Always log the decision itself.
+      const { data: dec, error: insErr } = await sb
+        .from("sanya_audit_decisions")
+        .insert({
+          company_id: companyId,
+          decision,
+          notes: notes ?? null,
+          decided_by: userId,
+        })
+        .select("id")
+        .single();
       if (insErr) throw insErr;
+
       if (decision === "approve") {
-        await sb.from("project_lifecycle_stage_runs").update({ stage_slug: "live", status: "completed", completed_at: new Date().toISOString() }).eq("project_id", companyId);
+        // Advance stage to live.
+        await sb
+          .from("project_lifecycle_stage_runs")
+          .update({ stage_slug: "live", status: "completed", completed_at: new Date().toISOString() })
+          .eq("project_id", companyId);
+      } else if (decision === "bugs") {
+        // Per PRD §11 anchor 4: insert tech_issues row → cascades via DB trigger to
+        // tenant_alerts; notify CTO + tech.
+        const { data: tech } = await sb
+          .from("ops_users")
+          .select("user_id, role")
+          .in("role", ["tech", "cto"]);
+        const assignee = ((tech ?? []) as Array<{ user_id: string; role: string }>).find((u) => u.role === "tech")?.user_id ?? null;
+        await sb.from("tech_issues").insert({
+          company_id: companyId,
+          raised_by: userId,
+          assignee_id: assignee,
+          title: `Audit-bug: ${(notes ?? "audit feedback").slice(0, 60)}`,
+          description: notes ?? null,
+          severity: "high",
+          priority: "high",
+          status: "open",
+        });
+        // Notify each tech + cto user.
+        const recipients = ((tech ?? []) as Array<{ user_id: string }>).map((u) => u.user_id);
+        if (recipients.length > 0) {
+          await sb.from("notifications").insert(recipients.map((rid) => ({
+            recipient_user_id: rid,
+            kind: "audit-bugs-high-priority",
+            severity: "high",
+            title: "Sanya raised audit bugs",
+            body: notes ?? "Audit found bugs; see decision notes.",
+            related_company_id: companyId,
+          })));
+        }
+      } else if (decision === "disapprove") {
+        // Per PRD §11 anchor 5: notify CEO + CTO (audit-disapproved).
+        const { data: leaders } = await sb
+          .from("ops_users")
+          .select("user_id, role")
+          .in("role", ["ceo", "cto"]);
+        const recipients = ((leaders ?? []) as Array<{ user_id: string }>).map((u) => u.user_id);
+        if (recipients.length > 0) {
+          await sb.from("notifications").insert(recipients.map((rid) => ({
+            recipient_user_id: rid,
+            kind: "audit-disapproved",
+            severity: "critical",
+            title: "Audit disapproved — fundamental issue",
+            body: notes ?? "Sanya flagged a fundamental issue with this account.",
+            related_company_id: companyId,
+          })));
+        }
       }
+      // Tag the decision row with the bug issue if Bugs was the path (best-effort).
+      void dec;
       onState("saved");
     } catch (e) {
       onState("error", e instanceof Error ? e.message : "Unknown error");

@@ -1,29 +1,19 @@
-// ScheduleCallPopup — Sanya multi-selects 3+ slots that work for her, then
-// queues an email to the customer with a unique link to pick one.
-// Real backend would create call_slot_offers + (on customer pick) a
-// scheduled_calls row with a real Google Meet link.
-// Mock backend writes call_slot_offers + an outbound_emails row.
+// ScheduleCallPopup — Sanya (or any ops_user) multi-selects from REAL open
+// slots derived from her saved calendar availability, then queues an email
+// to the customer with a unique link to pick one.
+//
+// Phase 9 (2026-05-22): slots now come from /functions/v1/calendar-list-slots
+// (in-house calendar v1). The customer-side picker URL hits
+// /functions/v1/calendar-book-slot which writes the real booking. There is
+// no longer a "mock provider" path on the customer-confirmation side.
+//
+// If the user hasn't set availability yet (/#calendar/availability), the
+// list of slots will be empty — the popup surfaces a help banner pointing
+// at that page.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Modal } from "./Modal";
 import { getFactorySupabase, isMockBackend } from "../lib/factorySupabase";
-
-function slotsForNextDays(days = 14) {
-  const out: Array<{ label: string; iso: string }> = [];
-  const now = new Date();
-  for (let d = 1; d <= days; d++) {
-    const day = new Date(now.getTime() + d * 86400_000);
-    for (const h of [10, 13, 15]) {
-      const slot = new Date(day);
-      slot.setHours(h, 0, 0, 0);
-      out.push({
-        label: slot.toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }),
-        iso: slot.toISOString(),
-      });
-    }
-  }
-  return out;
-}
 
 function randomToken() {
   return Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6);
@@ -48,7 +38,73 @@ export function ScheduleCallPopup({
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [pickerUrl, setPickerUrl] = useState<string | null>(null);
-  const slots = slotsForNextDays();
+  const [slots, setSlots] = useState<Array<{ label: string; iso: string; endIso: string }>>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [slotsHint, setSlotsHint] = useState<string | null>(null);
+
+  // Load open slots from the in-house calendar when the popup opens.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    void (async () => {
+      setSlotsLoading(true);
+      setSlotsHint(null);
+      try {
+        const sb = getFactorySupabase();
+        const { data: session } = await sb.auth.getSession();
+        const jwt = session?.session?.access_token;
+        const userId = session?.session?.user?.id;
+        if (!jwt || !userId) {
+          if (!cancelled) {
+            setSlotsHint("Sign in to load your calendar.");
+            setSlots([]);
+          }
+          return;
+        }
+        const base = (import.meta.env.VITE_SUPABASE_URL as string | undefined) ?? "";
+        const now = new Date();
+        // Window: next 14 days starting tomorrow at 00:00 local.
+        const start = new Date(now.getTime() + 86_400_000);
+        const end = new Date(now.getTime() + 14 * 86_400_000);
+        const res = await fetch(`${base}/functions/v1/calendar-list-slots`, {
+          method: "POST",
+          headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json" },
+          body: JSON.stringify({
+            owner_user_id: userId,
+            range_start: start.toISOString(),
+            range_end: end.toISOString(),
+          }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+        const json = await res.json() as { slots?: Array<{ starts_at: string; ends_at: string }>; note?: string };
+        if (cancelled) return;
+        if (!json.slots || json.slots.length === 0) {
+          setSlots([]);
+          setSlotsHint(
+            json.note?.includes("no active availability")
+              ? "You haven't set your availability yet — go to Calendar → My availability."
+              : "No open slots in the next 14 days. Check your availability or try a different week."
+          );
+          return;
+        }
+        setSlots(json.slots.map((s) => ({
+          iso: s.starts_at,
+          endIso: s.ends_at,
+          label: new Date(s.starts_at).toLocaleString(undefined, {
+            weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+          }),
+        })));
+      } catch (e) {
+        if (!cancelled) {
+          setSlotsHint(`Couldn't load slots: ${e instanceof Error ? e.message : String(e)}`);
+          setSlots([]);
+        }
+      } finally {
+        if (!cancelled) setSlotsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [open]);
 
   function toggle(iso: string) {
     const next = new Set(selected);
@@ -62,14 +118,20 @@ export function ScheduleCallPopup({
     setStatus("sending");
     try {
       const sb = getFactorySupabase();
+      const { data: session } = await sb.auth.getSession();
+      const offeredBy = session?.session?.user?.id ?? null;
       const token = randomToken();
+      // Build slot pairs from the loaded slots (start_iso + end_iso) keyed by
+      // the user's selections. The API gave us the canonical end, so use that
+      // instead of computing start+duration ourselves.
+      const slotMap = new Map(slots.map((s) => [s.iso, s.endIso]));
       const slotsArr = Array.from(selected).sort().map((iso) => ({
         start_iso: iso,
-        end_iso: new Date(new Date(iso).getTime() + duration * 60_000).toISOString(),
+        end_iso: slotMap.get(iso) ?? new Date(new Date(iso).getTime() + duration * 60_000).toISOString(),
       }));
       const { data: offerRow, error: offErr } = await sb.from("call_slot_offers").insert({
         company_id: companyId,
-        offered_by: null,
+        offered_by: offeredBy,
         agenda,
         duration_min: duration,
         slots: slotsArr,
@@ -103,30 +165,29 @@ export function ScheduleCallPopup({
 
   async function simulateClientPick() {
     if (!pickerUrl || selected.size === 0) return;
-    const sb = getFactorySupabase();
-    const slotsArr = Array.from(selected).sort();
-    const chosen = slotsArr[0];
-    const meet = `https://meet.google.com/mock-${randomToken().slice(0, 11)}`;
-    await sb.from("scheduled_calls").insert({
-      company_id: companyId,
-      offer_id: null,
-      slot_start: chosen,
-      slot_end: new Date(new Date(chosen).getTime() + duration * 60_000).toISOString(),
-      agenda,
-      provider: "mock",
-      meet_url: meet,
-    });
-    if (customerEmail) {
-      await sb.from("outbound_emails").insert({
-        company_id: companyId,
-        recipient_email: customerEmail,
-        template: "schedule_call_confirm",
-        payload: { company_name: companyName, slot_start: chosen, meet_url: meet },
-        status: "queued",
-      });
+    // The pickerUrl looks like https://welcome.aubos.ai/pick/<token>; extract the token.
+    const token = pickerUrl.split("/").pop() ?? "";
+    if (token.length < 16) {
+      alert("Picker token missing or malformed — can't simulate.");
+      return;
     }
-    alert(`✓ Mock customer picked the first slot.\nMeet link: ${meet}\nThis call will now show on the Calendar widget.`);
-    onClose();
+    try {
+      const base = (import.meta.env.VITE_SUPABASE_URL as string | undefined) ?? "";
+      const res = await fetch(`${base}/functions/v1/calendar-book-slot`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ picker_token: token, picked_slot_index: 0 }),
+      });
+      const json = await res.json().catch(() => ({} as Record<string, unknown>));
+      if (!res.ok) {
+        alert(`✗ Simulate failed: HTTP ${res.status} — ${JSON.stringify(json).slice(0, 200)}`);
+        return;
+      }
+      alert(`✓ Customer picked the first slot.\nBooking id: ${(json as { booking_id?: string }).booking_id ?? "(missing)"}\nThis call will now show on your bookings page.`);
+      onClose();
+    } catch (e) {
+      alert(`✗ Simulate failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
   if (status === "sent" && pickerUrl) {
@@ -200,29 +261,39 @@ export function ScheduleCallPopup({
           <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>
             Pick slots (multi-select) — {selected.size} selected
           </label>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, maxHeight: 280, overflow: "auto", border: "1px solid #e5e7eb", borderRadius: 6, padding: 8 }}>
-            {slots.map((s) => {
-              const isSel = selected.has(s.iso);
-              return (
-                <button
-                  key={s.iso}
-                  type="button"
-                  onClick={() => toggle(s.iso)}
-                  style={{
-                    padding: 8,
-                    border: "1px solid #e5e7eb",
-                    borderRadius: 6,
-                    background: isSel ? "#2563eb" : "white",
-                    color: isSel ? "white" : "#111827",
-                    cursor: "pointer",
-                    fontSize: 12,
-                  }}
-                >
-                  {isSel ? "✓ " : ""}{s.label}
-                </button>
-              );
-            })}
-          </div>
+          {slotsLoading ? (
+            <div style={{ padding: 16, border: "1px solid #e5e7eb", borderRadius: 6, color: "#6b7280", fontSize: 13, textAlign: "center" }}>
+              Loading your available slots…
+            </div>
+          ) : slots.length === 0 ? (
+            <div style={{ padding: 12, background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a", borderRadius: 6, fontSize: 13 }}>
+              {slotsHint ?? "No slots available."}
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, maxHeight: 280, overflow: "auto", border: "1px solid #e5e7eb", borderRadius: 6, padding: 8 }}>
+              {slots.map((s) => {
+                const isSel = selected.has(s.iso);
+                return (
+                  <button
+                    key={s.iso}
+                    type="button"
+                    onClick={() => toggle(s.iso)}
+                    style={{
+                      padding: 8,
+                      border: "1px solid #e5e7eb",
+                      borderRadius: 6,
+                      background: isSel ? "#2563eb" : "white",
+                      color: isSel ? "white" : "#111827",
+                      cursor: "pointer",
+                      fontSize: 12,
+                    }}
+                  >
+                    {isSel ? "✓ " : ""}{s.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {isMockBackend() ? (

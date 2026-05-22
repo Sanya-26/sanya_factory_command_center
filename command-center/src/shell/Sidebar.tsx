@@ -16,7 +16,7 @@ interface SectionDef {
   exactId?: string;
 }
 interface DeptDef {
-  id: "cleo" | "factory" | "product" | "ceo";
+  id: "cleo" | "factory" | "product" | "ceo" | "calendar";
   label: string;
   glyph: string;
   sections: SectionDef[];
@@ -69,6 +69,16 @@ const PRODUCT_DEPARTMENTS: DeptDef[] = [
   },
 ];
 
+const CALENDAR_DEPARTMENT: DeptDef = {
+  id: "calendar",
+  label: "Calendar",
+  glyph: "▦",
+  sections: [
+    { id: "availability", label: "My availability" },
+    { id: "bookings",     label: "My bookings" },
+  ],
+};
+
 const CEO_DEPARTMENTS: DeptDef[] = [
   {
     id: "ceo",
@@ -103,13 +113,16 @@ export function Sidebar({
 }): JSX.Element {
   const [raiseOpen, setRaiseOpen] = useState(false);
   // Sidebar follows the current view: route.dept first, role as default for unknown routes.
-  const departments =
+  // Calendar section appears at the bottom of every variant — available to all ops_users.
+  const baseDepartments =
     route.dept === "ceo" ? CEO_DEPARTMENTS :
     route.dept === "product" ? PRODUCT_DEPARTMENTS :
     role === "product_manager" ? PRODUCT_DEPARTMENTS :
     role === "ceo" ? CEO_DEPARTMENTS :
     TECH_DEPARTMENTS;
+  const departments: DeptDef[] = [...baseDepartments, CALENDAR_DEPARTMENT];
   const viewLabel =
+    route.dept === "calendar" ? "Calendar" :
     route.dept === "ceo" ? "Executive" :
     route.dept === "product" ? "Product" :
     role === "product_manager" ? "Product" :

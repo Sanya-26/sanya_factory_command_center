@@ -65,39 +65,73 @@ export function ProductVariationPage({ niche }: { niche: string }): JSX.Element 
           .from("companies")
           .select("id, name, email")
           .eq("niche", niche);
-        if (cErr) throw cErr;
+        if (cErr) {
+          // Don't throw — degrade gracefully. RLS on `companies` requires
+          // is_ops_user() (authenticated role), so anon-keyed dev sessions
+          // 401 here. Surface the actual error in dev mode so it's not
+          // hidden behind "Unknown error".
+          if (cancelled) return;
+          setError(`Failed to load customers for "${niche}": ${cErr.message}${
+            import.meta.env.DEV && cErr.message.includes("is_ops_user")
+              ? " — anon role can't read companies. Sign in via welcome.aubos.ai/login as a user with an ops_users row."
+              : ""
+          }`);
+          setRows([]); // empty result so the page still renders the funnel + phase sections
+          return;
+        }
         const companyIds = ((comps ?? []) as Array<{ id: string }>).map((c) => c.id);
 
-        const { data: stages } = await sb
-          .from("project_lifecycle_stage_runs")
-          .select("project_id, stage_slug, updated_at")
-          .in("project_id", companyIds)
-          .order("updated_at", { ascending: false });
+        // The remaining queries either tolerate empty IN clauses or are
+        // permissive (RLS via _ops_all). Errors here are surfaced individually
+        // but never abort the whole render.
+        const safeQuery = async <T,>(label: string, p: PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> => {
+          const { data, error: qErr } = await p;
+          if (qErr && import.meta.env.DEV) {
+            console.warn(`[ProductVariation] ${label} failed (continuing with empty):`, qErr.message);
+          }
+          return (data ?? []) as T[];
+        };
 
-        const { data: openFlags } = await sb
-          .from("customer_flags")
-          .select("company_id")
-          .in("company_id", companyIds)
-          .eq("status", "open");
+        const stages = companyIds.length === 0
+          ? []
+          : await safeQuery<{ project_id: string; stage_slug: string }>("stages",
+              sb.from("project_lifecycle_stage_runs")
+                .select("project_id, stage_slug, updated_at")
+                .in("project_id", companyIds)
+                .order("updated_at", { ascending: false }),
+            );
 
-        const { data: openIssues } = await sb
-          .from("tech_issues")
-          .select("company_id, status")
-          .in("company_id", companyIds);
+        const openFlags = companyIds.length === 0
+          ? []
+          : await safeQuery<{ company_id: string }>("flags",
+              sb.from("customer_flags")
+                .select("company_id")
+                .in("company_id", companyIds)
+                .eq("status", "open"),
+            );
 
-        const health = await fetchAccountHealth(companyIds);
+        const openIssues = companyIds.length === 0
+          ? []
+          : await safeQuery<{ company_id: string; status: string }>("issues",
+              sb.from("tech_issues")
+                .select("company_id, status")
+                .in("company_id", companyIds),
+            );
+
+        let health: Awaited<ReturnType<typeof fetchAccountHealth>> = [];
+        try { health = await fetchAccountHealth(companyIds); } catch (he) {
+          if (import.meta.env.DEV) console.warn("[ProductVariation] v_account_health failed:", he);
+        }
         if (cancelled) return;
 
         const stageByCompany: Record<string, string> = {};
-        for (const s of (stages ?? []) as Array<{ project_id: string; stage_slug: string }>) {
-          if (!stageByCompany[s.project_id]) stageByCompany[s.project_id] = s.stage_slug;
-        }
+        for (const s of stages) if (!stageByCompany[s.project_id]) stageByCompany[s.project_id] = s.stage_slug;
+
         const flagByCompany: Record<string, number> = {};
-        for (const f of (openFlags ?? []) as Array<{ company_id: string }>) {
-          flagByCompany[f.company_id] = (flagByCompany[f.company_id] || 0) + 1;
-        }
+        for (const f of openFlags) flagByCompany[f.company_id] = (flagByCompany[f.company_id] || 0) + 1;
+
         const issueByCompany: Record<string, number> = {};
-        for (const i of (openIssues ?? []) as Array<{ company_id: string; status: string }>) {
+        for (const i of openIssues) {
           if (i.company_id && !["done", "wontfix"].includes(i.status)) {
             issueByCompany[i.company_id] = (issueByCompany[i.company_id] || 0) + 1;
           }
@@ -107,14 +141,19 @@ export function ProductVariationPage({ niche }: { niche: string }): JSX.Element 
           id: c.id,
           name: c.name,
           email: c.email,
-          stage_slug: stageByCompany[c.id] ?? null,
+          // Per acceptance criteria: if stage data is missing, default to phase1
+          // (Sign / earliest funnel position) so the customer still appears.
+          stage_slug: stageByCompany[c.id] ?? "intake",
           flag_count: flagByCompany[c.id] ?? 0,
           issue_count: issueByCompany[c.id] ?? 0,
           health: (health.find((h) => h.company_id === c.id)?.status ?? "green") as HealthStatus,
         }));
         setRows(out);
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Unknown error");
+        if (!cancelled) setError(`${e instanceof Error ? e.message : "Unknown error"}${
+          import.meta.env.DEV ? " (caught in outer try; see console for stack)" : ""
+        }`);
+        if (import.meta.env.DEV) console.error("[ProductVariation] outer error:", e);
       }
     })();
     return () => { cancelled = true; };

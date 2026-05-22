@@ -22,7 +22,7 @@
 //   product_manager → #product
 //   everyone else   → #cleo/customers
 
-export type Department = "cleo" | "factory" | "product" | "ceo";
+export type Department = "cleo" | "factory" | "product" | "ceo" | "calendar";
 
 export interface Route {
   dept: Department;
@@ -46,12 +46,12 @@ export function parseHash(hash: string): Route | null {
   if (!stripped) return null;
   const parts = stripped.split("/").filter(Boolean);
   const dept = parts[0] as Department;
-  if (dept !== "cleo" && dept !== "factory" && dept !== "product" && dept !== "ceo") return null;
+  if (dept !== "cleo" && dept !== "factory" && dept !== "product" && dept !== "ceo" && dept !== "calendar") return null;
   return {
     dept,
     section:
       parts[1] ||
-      (dept === "cleo" ? "customers" : dept === "factory" ? "overview" : "home"),
+      (dept === "cleo" ? "customers" : dept === "factory" ? "overview" : dept === "calendar" ? "availability" : "home"),
     id: parts[2],
     sub: parts[3],
   };
