@@ -101,8 +101,19 @@ export function ProjectTaskSection({ issues, users }: ProjectTaskSectionProps) {
 
   const getAssigneeName = (id: string | null | undefined) => {
     if (!id) return '—';
-    return users.find((u) => u.user_id === id)?.display_name ?? id.slice(0, 8);
+    const user = users.find((u) => u.user_id === id);
+    if (user?.display_name) return user.display_name;
+    // Parse name from ID format like "u-adam-0" → "Adam"
+    const parts = id.split('-').filter((p) => p && p !== 'u');
+    if (parts.length > 0) {
+      const name = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+      return name;
+    }
+    return id.slice(0, 8);
   };
+
+  const total = allStats.open + allStats.in_progress + allStats.blocked + allStats.done;
+  const percentDone = total > 0 ? Math.round((allStats.done / total) * 100) : 0;
 
   return (
     <section style={{ padding: '24px 0' }}>
@@ -110,23 +121,27 @@ export function ProjectTaskSection({ issues, users }: ProjectTaskSectionProps) {
         type="button"
         onClick={() => setOpen(!open)}
         style={{
-          background: 'transparent',
-          border: 'none',
+          background: '#ffffff',
+          border: '1px solid #e5e7eb',
+          borderRadius: 8,
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
-          gap: 8,
-          padding: 0,
-          fontSize: 16,
-          fontWeight: 600,
-          color: '#111827',
+          gap: 12,
+          padding: '12px 16px',
+          fontSize: 18,
+          fontWeight: 700,
+          color: '#000000',
           marginBottom: open ? 16 : 0,
         }}
       >
         <span>{open ? '▼' : '▶'}</span>
         <span>Projects & tasks</span>
-        <span style={{ fontSize: 13, fontWeight: 400, color: '#6b7280' }}>
-          ({allStats.open} open · {allStats.in_progress} in progress · {allStats.done} done)
+        <span style={{ fontSize: 14, fontWeight: 600, color: '#111827', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span>({allStats.open} open · {allStats.in_progress} in progress · {allStats.blocked} blocked · {allStats.done} done)</span>
+          <span style={{ fontSize: 13, fontWeight: 500, color: '#047857', backgroundColor: '#d1fae5', padding: '2px 10px', borderRadius: 4 }}>
+            {percentDone}% complete
+          </span>
         </span>
       </button>
 
@@ -271,17 +286,17 @@ export function ProjectTaskSection({ issues, users }: ProjectTaskSectionProps) {
                       display: 'grid',
                       gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr',
                       gap: 0,
-                      padding: '10px 12px',
+                      padding: '12px 12px',
                       borderTop: i === 0 ? 'none' : '1px solid #e5e7eb',
-                      background: i % 2 === 0 ? '#f9fafb' : 'transparent',
+                      background: i % 2 === 0 ? '#ffffff' : '#f9fafb',
                       fontSize: 13,
                       alignItems: 'center',
                     }}
                   >
-                    <div style={{ color: '#111827', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div style={{ color: '#111827', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {issue.title}
                     </div>
-                    <div style={{ color: '#6b7280', fontSize: 12 }}>
+                    <div style={{ color: '#111827', fontWeight: 500, fontSize: 13 }}>
                       {getAssigneeName(issue.assignee_id)}
                     </div>
                     <div>
