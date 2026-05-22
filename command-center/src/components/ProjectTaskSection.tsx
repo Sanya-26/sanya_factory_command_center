@@ -133,16 +133,27 @@ export function ProjectTaskSection({ issues, users }: ProjectTaskSectionProps) {
           fontWeight: 700,
           color: '#000000',
           marginBottom: open ? 16 : 0,
+          width: '100%',
+          justifyContent: 'space-between',
         }}
       >
-        <span>{open ? '▼' : '▶'}</span>
-        <span>Projects & tasks</span>
-        <span style={{ fontSize: 14, fontWeight: 600, color: '#111827', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span>({allStats.open} open · {allStats.in_progress} in progress · {allStats.blocked} blocked · {allStats.done} done)</span>
-          <span style={{ fontSize: 13, fontWeight: 500, color: '#047857', backgroundColor: '#d1fae5', padding: '2px 10px', borderRadius: 4 }}>
-            {percentDone}% complete
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span>{open ? '▼' : '▶'}</span>
+          <span>Projects & tasks</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flex: 1, marginLeft: 24 }}>
+          <span style={{ fontSize: 13, fontWeight: 500, color: '#6b7280' }}>
+            {allStats.open} open · {allStats.in_progress} in progress · {allStats.blocked} blocked · {allStats.done} done
           </span>
-        </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 200 }}>
+            <div style={{ flex: 1, height: 8, background: '#e5e7eb', borderRadius: 4, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${percentDone}%`, background: '#10b981', transition: 'width 0.3s ease' }} />
+            </div>
+            <span style={{ fontSize: 14, fontWeight: 700, color: '#047857', minWidth: 45 }}>
+              {percentDone}%
+            </span>
+          </div>
+        </div>
       </button>
 
       {open && (
