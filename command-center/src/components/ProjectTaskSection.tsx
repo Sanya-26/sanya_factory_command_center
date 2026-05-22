@@ -112,6 +112,20 @@ export function ProjectTaskSection({ issues, users }: ProjectTaskSectionProps) {
     return id.slice(0, 8);
   };
 
+  const getProgressPercent = (status: Status | string): number => {
+    switch (status) {
+      case 'done':
+        return 100;
+      case 'in_progress':
+        return 50;
+      case 'open':
+      case 'blocked':
+      case 'wontfix':
+      default:
+        return 0;
+    }
+  };
+
   const total = allStats.open + allStats.in_progress + allStats.blocked + allStats.done;
   const percentDone = total > 0 ? Math.round((allStats.done / total) * 100) : 0;
 
@@ -141,19 +155,9 @@ export function ProjectTaskSection({ issues, users }: ProjectTaskSectionProps) {
           <span>{open ? '▼' : '▶'}</span>
           <span>Projects & tasks</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flex: 1, marginLeft: 24 }}>
-          <span style={{ fontSize: 13, fontWeight: 500, color: '#6b7280' }}>
-            {allStats.open} open · {allStats.in_progress} in progress · {allStats.blocked} blocked · {allStats.done} done
-          </span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 200 }}>
-            <div style={{ flex: 1, height: 8, background: '#e5e7eb', borderRadius: 4, overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${percentDone}%`, background: '#10b981', transition: 'width 0.3s ease' }} />
-            </div>
-            <span style={{ fontSize: 14, fontWeight: 700, color: '#047857', minWidth: 45 }}>
-              {percentDone}%
-            </span>
-          </div>
-        </div>
+        <span style={{ fontSize: 13, fontWeight: 500, color: '#6b7280' }}>
+          {allStats.open} open · {allStats.in_progress} in progress · {allStats.blocked} blocked · {allStats.done} done
+        </span>
       </button>
 
       {open && (
@@ -270,7 +274,7 @@ export function ProjectTaskSection({ issues, users }: ProjectTaskSectionProps) {
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr',
+                  gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr',
                   gap: 0,
                   padding: '8px 12px',
                   background: '#f9fafb',
@@ -284,6 +288,7 @@ export function ProjectTaskSection({ issues, users }: ProjectTaskSectionProps) {
                 <div>Assignee</div>
                 <div>Status</div>
                 <div>Priority</div>
+                <div>Progress</div>
                 <div>Age</div>
               </div>
               {filtered.map((issue, i) => {
@@ -295,7 +300,7 @@ export function ProjectTaskSection({ issues, users }: ProjectTaskSectionProps) {
                     key={issue.id}
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr',
+                      gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr',
                       gap: 0,
                       padding: '12px 12px',
                       borderTop: i === 0 ? 'none' : '1px solid #e5e7eb',
@@ -338,6 +343,21 @@ export function ProjectTaskSection({ issues, users }: ProjectTaskSectionProps) {
                         }}
                       >
                         {issue.priority ?? 'normal'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{ flex: 1, height: 6, background: '#e5e7eb', borderRadius: 3, overflow: 'hidden' }}>
+                        <div
+                          style={{
+                            height: '100%',
+                            width: `${getProgressPercent(issue.status)}%`,
+                            background: statusColor(issue.status),
+                            transition: 'width 0.3s ease',
+                          }}
+                        />
+                      </div>
+                      <span style={{ fontSize: 11, fontWeight: 500, color: '#6b7280', minWidth: 28 }}>
+                        {getProgressPercent(issue.status)}%
                       </span>
                     </div>
                     <div style={{ color: '#6b7280', fontSize: 12 }}>
